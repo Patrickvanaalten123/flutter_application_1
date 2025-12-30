@@ -77,14 +77,20 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
                       isThreeLine: true,
                       trailing: Checkbox(value: checked, onChanged: (v) {
                         setState(() {
-                          if (v == true) _selectedTemplateIds.add(t.id);
-                          else _selectedTemplateIds.remove(t.id);
+                          if (v == true) {
+                            _selectedTemplateIds.add(t.id);
+                          } else {
+                            _selectedTemplateIds.remove(t.id);
+                          }
                         });
                       }),
                       onTap: () {
                         setState(() {
-                          if (checked) _selectedTemplateIds.remove(t.id);
-                          else _selectedTemplateIds.add(t.id);
+                          if (checked) {
+                            _selectedTemplateIds.remove(t.id);
+                          } else {
+                            _selectedTemplateIds.add(t.id);
+                          }
                         });
                       },
                     );

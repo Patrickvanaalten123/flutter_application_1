@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<key>NSPhotoLibraryUsageDescription</key>
- 	<string>We use your photos so you can set a profile picture.</string>
-  	<key>NSCameraUsageDescription</key>
-  	<string>We use the camera if you want to take a profile picture.</string>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We use your photos so you can set a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We use the camera if you want to take a profile picture.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Boetepot</string>
 	<key>CFBundleExecutable</key>

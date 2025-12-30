@@ -5,12 +5,18 @@ class AppUser {
   final String email;
   final String? displayName;
   final String? photoURL;
+  final String? phone;
+  final String? preferredGroupId;
+  final UserPreferences preferences;
 
   AppUser({
     required this.id,
     required this.email,
     this.displayName,
     this.photoURL,
+    this.phone,
+    this.preferredGroupId,
+    this.preferences = const UserPreferences(),
   });
 
   factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -20,6 +26,9 @@ class AppUser {
       email: (d['email'] as String?) ?? '',
       displayName: d['displayName'] as String?,
       photoURL: d['photoURL'] as String?,
+      phone: d['phone'] as String?,
+      preferredGroupId: d['preferredGroupId'] as String?,
+      preferences: UserPreferences.fromMap(d['preferences'] as Map<String, dynamic>?),
     );
   }
 
@@ -27,6 +36,53 @@ class AppUser {
         'email': email,
         if (displayName != null) 'displayName': displayName,
         if (photoURL != null) 'photoURL': photoURL,
+        if (phone != null) 'phone': phone,
+        if (preferredGroupId != null) 'preferredGroupId': preferredGroupId,
+        'preferences': preferences.toMap(),
+      };
+
+  AppUser copyWith({
+    String? displayName,
+    String? photoURL,
+    String? preferredGroupId,
+    UserPreferences? preferences,
+  }) {
+    return AppUser(
+      id: id,
+      email: email,
+      displayName: displayName ?? this.displayName,
+      photoURL: photoURL ?? this.photoURL,
+      phone: phone,
+      preferredGroupId: preferredGroupId ?? this.preferredGroupId,
+      preferences: preferences ?? this.preferences,
+    );
+  }
+}
+
+class UserPreferences {
+  final bool notificationsEnabled;
+  final String? locale;
+  final String? currencyCode;
+
+  const UserPreferences({
+    this.notificationsEnabled = true,
+    this.locale,
+    this.currencyCode = 'EUR',
+  });
+
+  factory UserPreferences.fromMap(Map<String, dynamic>? map) {
+    final m = map ?? const <String, dynamic>{};
+    return UserPreferences(
+      notificationsEnabled: (m['notificationsEnabled'] as bool?) ?? true,
+      locale: m['locale'] as String?,
+      currencyCode: m['currencyCode'] as String? ?? 'EUR',
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'notificationsEnabled': notificationsEnabled,
+        if (locale != null) 'locale': locale,
+        if (currencyCode != null) 'currencyCode': currencyCode,
       };
 }
 
@@ -155,6 +211,21 @@ class PaymentRound {
       status: (d['status'] as String?) ?? 'open',
       note: d['note'] as String?,
       asOf: (d['asOf'] as Timestamp?) ?? Timestamp.now(),
+    );
+  }
+
+  PaymentRound copyWith({
+    String? status,
+    String? note,
+  }) {
+    return PaymentRound(
+      id: id,
+      groupId: groupId,
+      createdAt: createdAt,
+      createdBy: createdBy,
+      status: status ?? this.status,
+      note: note ?? this.note,
+      asOf: asOf,
     );
   }
 }

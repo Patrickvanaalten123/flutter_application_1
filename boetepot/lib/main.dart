@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/home_shell.dart';
 import 'services/user_service.dart';
+import 'ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,10 +21,7 @@ class BoetePotApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'BoetePot',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD4AF37)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.themeData(),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {

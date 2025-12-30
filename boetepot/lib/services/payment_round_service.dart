@@ -61,6 +61,8 @@ class PaymentRoundService {
   }
 
   // Create round: aggregate boetes up to asOf, subtract already-paid in previous rounds (<= asOf)
+  // ... keep your imports and class
+
   Future<PaymentRound> createRound({
     required String groupId,
     required DateTime asOf,
@@ -106,6 +108,25 @@ class PaymentRoundService {
       }
     }
 
+    // 3b) Fetch user emails/displayNames for members (so payments have names)
+    final Map<String, Map<String, String>> usersByUid = {};
+    if (members.isNotEmpty) {
+      final chunks = <List<String>>[];
+      for (var i = 0; i < members.length; i += 10) {
+        chunks.add(members.sublist(i, i + 10 > members.length ? members.length : i + 10));
+      }
+      for (final chunk in chunks) {
+        final snap = await _db.collection('users').where(FieldPath.documentId, whereIn: chunk).get();
+        for (final d in snap.docs) {
+          final data = d.data();
+          usersByUid[d.id] = {
+            'email': (data['email'] as String?) ?? '',
+            'displayName': (data['displayName'] as String?) ?? '',
+          };
+        }
+      }
+    }
+
     // 4) Create round doc
     final roundRef = await _db.collection('paymentRounds').add({
       'groupId': groupId,
@@ -124,11 +145,12 @@ class PaymentRoundService {
       final due = (total - paidSoFar);
       if (!includeZeroMembers && due <= 0) continue;
 
+      final info = usersByUid[uid] ?? const {'email': '', 'displayName': ''};
       final payRef = roundRef.collection('payments').doc(uid);
       batch.set(payRef, {
         'uid': uid,
-        'email': '',         // optional: you can fill from users if desired
-        'displayName': '',   // optional
+        'email': info['email'],
+        'displayName': info['displayName'],
         'amount': due < 0 ? 0.0 : due,
         'paid': false,
         'paidAt': null,

@@ -13,6 +13,8 @@ class UserService {
       await ref.set({
         'email': user.email ?? '',
         if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
+        'isAdmin': false,
+        'preferences': const UserPreferences().toMap(),
       }, SetOptions(merge: true));
     } else if (displayName != null && displayName.isNotEmpty) {
       await ref.set({'displayName': displayName}, SetOptions(merge: true));
@@ -28,5 +30,23 @@ class UserService {
 
   static Future<void> setPhotoURL(String uid, String url) {
     return _db.collection('users').doc(uid).set({'photoURL': url}, SetOptions(merge: true));
+  }
+
+  static Future<void> setDisplayName(String uid, String name) {
+    return _db.collection('users').doc(uid).set({'displayName': name}, SetOptions(merge: true));
+  }
+
+  static Future<void> setPreferredGroup(String uid, String groupId) {
+    return _db.collection('users').doc(uid).set({'preferredGroupId': groupId}, SetOptions(merge: true));
+  }
+
+  static Future<void> setNotifications(String uid, bool enabled) {
+    return _db.collection('users').doc(uid).set({
+      'preferences.notificationsEnabled': enabled,
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> setAdmin(String uid, bool isAdmin) {
+    return _db.collection('users').doc(uid).set({'isAdmin': isAdmin}, SetOptions(merge: true));
   }
 }
