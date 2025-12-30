@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "890322432461",
+    "project_id": "boetepot-4bdcc",
+    "storage_bucket": "boetepot-4bdcc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:890322432461:android:27a511715dfadcd34f5484",
+        "android_client_info": {
+          "package_name": "com.example.boetepot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2ehxEKFE8Qzg0vq4f4XnKIvpWdOOBOu0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
