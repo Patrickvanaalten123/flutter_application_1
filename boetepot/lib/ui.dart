@@ -21,6 +21,21 @@ class AppTheme {
         primary: gold,
         secondary: gold,
       ),
+      textTheme: base.textTheme.copyWith(
+        titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.3, height: 1.1),
+        titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.25, height: 1.15),
+        titleSmall: base.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.15, height: 1.2),
+        bodyLarge: base.textTheme.bodyLarge?.copyWith(letterSpacing: -0.15, height: 1.25),
+        bodyMedium: base.textTheme.bodyMedium?.copyWith(letterSpacing: -0.1, height: 1.25),
+        bodySmall: base.textTheme.bodySmall?.copyWith(letterSpacing: -0.05, height: 1.2),
+        labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.1),
+        labelMedium: base.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.05),
+        labelSmall: base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0),
+      ).apply(
+        bodyColor: textPrimary,
+        displayColor: textPrimary,
+        fontFamily: 'Inter',
+      ),
       scaffoldBackgroundColor: Colors.transparent,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -38,6 +53,39 @@ class AppTheme {
       dialogTheme: const DialogThemeData(
         backgroundColor: Color.fromRGBO(18, 18, 22, 1),
         surfaceTintColor: Colors.transparent,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: gold,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: textPrimary,
+          side: const BorderSide(color: cardStroke, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: cardFill,
+        hintStyle: base.textTheme.bodyMedium?.copyWith(color: textSecondary),
+        labelStyle: base.textTheme.bodySmall?.copyWith(color: textSecondary, fontWeight: FontWeight.w600),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: cardStroke, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: gold, width: 1.2),
+        ),
       ),
     );
   }
@@ -103,6 +151,11 @@ class AppCard extends StatelessWidget {
             color: Colors.black.withAlpha((0.35 * 255).round()),
             blurRadius: 18,
             offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: AppTheme.gold.withAlpha((0.08 * 255).round()),
+            blurRadius: 26,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -256,6 +309,66 @@ class AppShell extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: bottomBar,
+    );
+  }
+}
+
+typedef AppBottomSheetChildBuilder = Widget Function(BuildContext context, ScrollController scrollController);
+
+class AppBottomSheet extends StatelessWidget {
+  const AppBottomSheet({
+    super.key,
+    required this.childBuilder,
+    this.initialChildSize = 0.72,
+    this.minChildSize = 0.40,
+    this.maxChildSize = 0.96,
+  });
+
+  final AppBottomSheetChildBuilder childBuilder;
+  final double initialChildSize;
+  final double minChildSize;
+  final double maxChildSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: initialChildSize,
+        minChildSize: minChildSize,
+        maxChildSize: maxChildSize,
+        builder: (context, scrollController) {
+          return SafeArea(
+            top: false,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              child: Material(
+                color: const Color(0xFF121216),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha((0.14 * 255).round()),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(child: childBuilder(context, scrollController)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

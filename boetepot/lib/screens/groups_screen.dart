@@ -18,6 +18,17 @@ class GroupsScreen extends StatelessWidget {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Kon BoetePots niet laden:\n${snap.error}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
         final items = snap.data ?? [];
         if (items.isEmpty) {
           return const Center(child: Text('No groups yet.'));

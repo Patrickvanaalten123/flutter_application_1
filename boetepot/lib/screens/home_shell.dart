@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/auth_service.dart';
 import '../services/group_service.dart';
+import '../services/boete_service.dart';
 import '../models.dart';
 import '../ui.dart';
 
@@ -27,6 +28,103 @@ class _HomeShellState extends State<HomeShell> {
   String? _selectedGroupName;
   Map<String, String> _currentRoles = {};
   List<AppUser> _currentMembers = [];
+  final _boeteService = BoeteService();
+  final GlobalKey _fabKey = GlobalKey();
+
+  Future<void> _showCreatePotSheet() async {
+    final name = TextEditingController();
+    final emails = TextEditingController();
+    String? error;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AppBottomSheet(
+        childBuilder: (sheetContext, scrollController) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Nieuwe BoetePot',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Naam'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: emails,
+                    decoration: const InputDecoration(labelText: 'Lid e-mails (komma gescheiden, optioneel)'),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(error!, style: const TextStyle(color: Colors.red)),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () async {
+                          final n = name.text.trim();
+                          if (n.isEmpty) {
+                            setState(() => error = 'Naam is verplicht');
+                            return;
+                          }
+                          final emailList = emails.text
+                              .split(',')
+                              .map((e) => e.trim().toLowerCase())
+                              .where((e) => e.isNotEmpty)
+                              .toList();
+                          try {
+                            final newId = await GroupService().createGroup(
+                              name: n,
+                              currentUid: FirebaseAuth.instance.currentUser!.uid,
+                              memberEmails: emailList,
+                            );
+                            setState(() => error = null);
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            setState(() {
+                              _selectedGroupId = newId;
+                              _selectedGroupName = n;
+                            });
+                            _startMembersWatch(newId);
+                          } catch (e) {
+                            setState(() => error = e.toString());
+                          }
+                        },
+                        child: const Text('Create'),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _openGroupPicker() async {
     await showModalBottomSheet(
@@ -52,6 +150,296 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Future<void> _showAddBoeteDialog() async {
+    if (_selectedGroupId == null) return;
+    final title = TextEditingController();
+    final desc = TextEditingController();
+    final amount = TextEditingController();
+    String selectedUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    String? error;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AppBottomSheet(
+        childBuilder: (sheetContext, scrollController) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Add Boete',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+                  const SizedBox(height: 10),
+                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: amount,
+                    decoration: const InputDecoration(labelText: 'Amount (€)'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedUid,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Assign to'),
+                    items: _currentMembers.map((u) {
+                      final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
+                      return DropdownMenuItem(value: u.id, child: Text(label));
+                    }).toList(),
+                    onChanged: (v) => setState(() => selectedUid = v ?? selectedUid),
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(error!, style: const TextStyle(color: Colors.red)),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      const SizedBox(width: 6),
+                      FilledButton(
+                        onPressed: () async {
+                          final t = title.text.trim();
+                          final d = desc.text.trim();
+                          final a = double.tryParse(amount.text.replaceAll(',', '.'));
+                          if (t.isEmpty || d.isEmpty || a == null) {
+                            setState(() => error = 'Please fill all fields with a valid amount.');
+                            return;
+                          }
+                          final assigneeEmail = _currentMembers
+                              .firstWhere((u) => u.id == selectedUid, orElse: () => AppUser(id: selectedUid, email: ''))
+                              .email;
+                          await _boeteService.addBoete(
+                            title: t,
+                            description: d,
+                            amount: a,
+                            userEmail: FirebaseAuth.instance.currentUser?.email ?? '',
+                            groupId: _selectedGroupId!,
+                            assignedToUid: selectedUid,
+                            assignedToEmail: assigneeEmail,
+                          );
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showAddFromTemplates() async {
+    if (_selectedGroupId == null) return;
+    final selected = <String>{};
+    String assignee = FirebaseAuth.instance.currentUser?.uid ?? '';
+    String? error;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AppBottomSheet(
+        childBuilder: (sheetContext, scrollController) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Add from templates',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: assignee,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Assign to'),
+                    items: _currentMembers.map((u) {
+                      final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
+                      return DropdownMenuItem(value: u.id, child: Text(label));
+                    }).toList(),
+                    onChanged: (v) => setState(() => assignee = v ?? assignee),
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<List<BoeteTemplate>>(
+                    stream: _boeteService.watchTemplates(_selectedGroupId!),
+                    builder: (context, snap) {
+                      if (!snap.hasData) {
+                        return const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final templates = snap.data!;
+                      if (templates.isEmpty) {
+                        return Text('No templates yet', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary));
+                      }
+                      return Column(
+                        children: templates.map((tpl) {
+                          final checked = selected.contains(tpl.id);
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(tpl.title, style: const TextStyle(color: AppTheme.textPrimary)),
+                            subtitle: Text(tpl.description, style: const TextStyle(color: AppTheme.textSecondary)),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('€${tpl.amount.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.textPrimary)),
+                                const SizedBox(height: 4),
+                                Icon(checked ? Icons.check_circle : Icons.circle_outlined, color: checked ? AppTheme.gold : AppTheme.textSecondary),
+                              ],
+                            ),
+                            onTap: () {
+                              setState(() {
+                                if (checked) {
+                                  selected.remove(tpl.id);
+                                } else {
+                                  selected.add(tpl.id);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(error!, style: const TextStyle(color: Colors.red)),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      const SizedBox(width: 6),
+                      FilledButton(
+                        onPressed: () async {
+                          final templatesSnap = await _boeteService.watchTemplates(_selectedGroupId!).first;
+                          final chosen = templatesSnap.where((t) => selected.contains(t.id)).toList();
+                          if (chosen.isEmpty) {
+                            setState(() => error = 'Select at least one template.');
+                            return;
+                          }
+                          final assigneeEmail = _currentMembers
+                              .firstWhere((u) => u.id == assignee, orElse: () => AppUser(id: assignee, email: ''))
+                              .email;
+                          await _boeteService.addBoetesFromTemplates(
+                            templates: chosen,
+                            assignedToUid: assignee,
+                            assignedToEmail: assigneeEmail,
+                            groupId: _selectedGroupId!,
+                            createdByEmail: FirebaseAuth.instance.currentUser?.email ?? '',
+                          );
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showQuickActionsMenu({required bool isAdmin}) async {
+    final renderObject = _fabKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+
+    final topLeft = renderObject.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomRight = renderObject.localToGlobal(renderObject.size.bottomRight(Offset.zero), ancestor: overlay);
+    final position = RelativeRect.fromRect(Rect.fromPoints(topLeft, bottomRight), Offset.zero & overlay.size);
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: position,
+      items: [
+        const PopupMenuItem(value: 'createPot', child: Text('Nieuwe BoetePot')),
+        PopupMenuItem(
+          value: 'addBoete',
+          enabled: _selectedGroupId != null,
+          child: const Text('Add Boete'),
+        ),
+        PopupMenuItem(
+          value: 'addFromTemplates',
+          enabled: _selectedGroupId != null,
+          child: const Text('Add from Templates'),
+        ),
+        if (isAdmin && _selectedGroupId != null)
+          const PopupMenuItem(value: 'manageTemplates', child: Text('Manage Templates')),
+      ],
+    );
+
+    if (!mounted || selected == null) return;
+
+    switch (selected) {
+      case 'createPot':
+        await _showCreatePotSheet();
+        break;
+      case 'addBoete':
+        await _showAddBoeteDialog();
+        break;
+      case 'addFromTemplates':
+        await _showAddFromTemplates();
+        break;
+      case 'manageTemplates':
+        if (_selectedGroupId != null && isAdmin) {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => TemplatesScreen(
+                  groupId: _selectedGroupId!,
+                  isAdmin: isAdmin,
+                  currentMembers: _currentMembers,
+                ),
+          ));
+        }
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
@@ -59,52 +447,76 @@ class _HomeShellState extends State<HomeShell> {
 
     return AppShell(
       topPadding: 10,
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: _HeaderRow(
-              title: switch (_index) {
-                0 => 'Boetes',
-                1 => 'Betalingen',
-                2 => 'Statistieken',
-                _ => 'Profiel',
-              },
-              subtitle: _selectedGroupName,
-              onPickGroup: _openGroupPicker,
-              onSignOut: () => AuthService.signOut(),
-              roleLabel: _currentRoles[user.uid],
-              onOpenTemplates: isAdmin && _selectedGroupId != null && (_index == 0 || _index == 1)
-                  ? () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => TemplatesScreen(
-                              groupId: _selectedGroupId!,
-                              isAdmin: isAdmin,
-                              currentMembers: _currentMembers,
-                            ),
-                      ))
-                  : null,
-              onOpenMembers: isAdmin && _selectedGroupId != null && (_index == 0 || _index == 1)
-                  ? () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => GroupMembersScreen(
-                              groupId: _selectedGroupId!,
-                              groupName: _selectedGroupName ?? '',
-                            ),
-                      ))
-                  : null,
-            ),
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: _HeaderRow(
+                  title: switch (_index) {
+                    0 => 'Boetes',
+                    1 => 'Betalingen',
+                    2 => 'Statistieken',
+                    _ => 'Profiel',
+                  },
+                  subtitle: _selectedGroupName,
+                  onPickGroup: _openGroupPicker,
+                  onSignOut: () => AuthService.signOut(),
+                  roleLabel: _currentRoles[user.uid],
+                  onCreatePot: _showCreatePotSheet,
+                  onOpenTemplates: isAdmin && _selectedGroupId != null && (_index == 0 || _index == 1)
+                      ? () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => TemplatesScreen(
+                                  groupId: _selectedGroupId!,
+                                  isAdmin: isAdmin,
+                                  currentMembers: _currentMembers,
+                                ),
+                          ))
+                      : null,
+                  onOpenMembers: isAdmin && _selectedGroupId != null && (_index == 0 || _index == 1)
+                      ? () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => GroupMembersScreen(
+                                  groupId: _selectedGroupId!,
+                                  groupName: _selectedGroupName ?? '',
+                                ),
+                          ))
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: IndexedStack(
+                  index: _index,
+                  children: [
+                    _buildBoetesTab(user),
+                    _buildBetalingenTab(user),
+                    _buildStatsTab(user),
+                    _buildProfileTab(user),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: [
-                _buildBoetesTab(user),
-                _buildBetalingenTab(user),
-                _buildStatsTab(user),
-                _buildProfileTab(user),
-              ],
+          if (_index == 0)
+            Positioned(
+              right: 18,
+              bottom: 60 + MediaQuery.of(context).padding.bottom,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(color: AppTheme.gold.withAlpha(70), blurRadius: 18, spreadRadius: 2),
+                  ],
+                ),
+                child: KeyedSubtree(
+                  key: _fabKey,
+                  child: GoldFab(
+                    icon: Icons.add,
+                    onPressed: () => _showQuickActionsMenu(isAdmin: isAdmin),
+                  ),
+                ),
+              ),
             ),
-          ),
         ],
       ),
       bottomBar: _BottomTabBar(
@@ -278,6 +690,7 @@ class _HeaderRow extends StatelessWidget {
     required this.onPickGroup,
     required this.onSignOut,
     this.roleLabel,
+    this.onCreatePot,
     this.onOpenTemplates,
     this.onOpenMembers,
   });
@@ -287,6 +700,7 @@ class _HeaderRow extends StatelessWidget {
   final VoidCallback onPickGroup;
   final VoidCallback onSignOut;
   final String? roleLabel;
+  final VoidCallback? onCreatePot;
   final VoidCallback? onOpenTemplates;
   final VoidCallback? onOpenMembers;
 
@@ -340,6 +754,14 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
+        if (onCreatePot != null)
+          _circleButton(
+            context,
+            icon: Icons.add,
+            tooltip: 'Nieuwe BoetePot',
+            onTap: onCreatePot!,
+          ),
+        if (onCreatePot != null) const SizedBox(width: 8),
         if (onOpenTemplates != null)
           _circleButton(
             context,

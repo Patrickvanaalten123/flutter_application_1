@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/boete_service.dart';
 import '../services/payment_round_service.dart';
 import '../services/group_service.dart';
-import 'templates_screen.dart';
 import '../models.dart';
 import '../ui.dart';
 
@@ -93,8 +92,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     return (_totalAmount(items) - paidSum).clamp(0, double.infinity);
   }
 
-  double _fabBottomOffset(BuildContext context) => 80 + MediaQuery.of(context).padding.bottom;
-
   Widget _detailRow(String label, String value, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -161,21 +158,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 18,
-            bottom: _fabBottomOffset(context),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(color: AppTheme.gold.withAlpha(70), blurRadius: 18, spreadRadius: 2),
-                ],
-              ),
-              child: GoldFab(
-                icon: Icons.add,
-                onPressed: _showCreatePotSheet,
               ),
             ),
           ),
@@ -256,25 +238,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
               ),
             );
           },
-        ),
-        Positioned(
-          right: 18,
-          bottom: _fabBottomOffset(context),
-          child: _FabMenu(
-            canAdd: widget.isAdminHere,
-            onAddBoete: _showAddBoeteDialog,
-            onAddFromTemplates: _showAddFromTemplates,
-            onCreatePot: _showCreatePotSheet,
-            onManageTemplates: widget.isAdminHere
-                ? () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => TemplatesScreen(
-                            groupId: widget.groupId!,
-                            isAdmin: widget.isAdminHere,
-                            currentMembers: widget.members,
-                          ),
-                    ))
-                : null,
-          ),
         ),
         if (_loadingTotals)
           const Positioned(
@@ -430,102 +393,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     );
   }
 
-  Future<void> _showAddBoeteDialog() async {
-    final gid = widget.groupId;
-    if (gid == null) return;
-    final title = TextEditingController();
-    final desc = TextEditingController();
-    final amount = TextEditingController();
-    String selectedUid = widget.currentUid;
-    String? error;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-            left: 12,
-            right: 12,
-            top: 12,
-          ),
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Add Boete', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
-                    TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
-                    TextField(
-                      controller: amount,
-                      decoration: const InputDecoration(labelText: 'Amount (€)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedUid,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Assign to'),
-                      items: widget.members.map((u) {
-                        final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
-                        return DropdownMenuItem(value: u.id, child: Text(label));
-                      }).toList(),
-                      onChanged: (v) => setState(() => selectedUid = v ?? selectedUid),
-                    ),
-                    if (error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(error!, style: const TextStyle(color: Colors.red)),
-                      ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                        const SizedBox(width: 6),
-                        FilledButton(
-                          onPressed: () async {
-                            final t = title.text.trim();
-                            final d = desc.text.trim();
-                            final a = double.tryParse(amount.text.replaceAll(',', '.'));
-                            if (t.isEmpty || d.isEmpty || a == null) {
-                              setState(() => error = 'Please fill all fields with a valid amount.');
-                              return;
-                            }
-                            final assigneeEmail = _memberByUid(selectedUid)?.email;
-                            await _boeteService.addBoete(
-                              title: t,
-                              description: d,
-                              amount: a,
-                              userEmail: widget.currentUserEmail,
-                              groupId: gid,
-                              assignedToUid: selectedUid,
-                              assignedToEmail: assigneeEmail,
-                            );
-                            if (!mounted) return;
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _showEditDialog(Boete b) async {
     final title = TextEditingController(text: b.title);
     final desc = TextEditingController(text: b.description);
@@ -535,27 +402,36 @@ class _BoetesScreenState extends State<BoetesScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-            left: 12,
-            right: 12,
-            top: 12,
-          ),
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
+        return AppBottomSheet(
+          childBuilder: (sheetContext, scrollController) {
+            return StatefulBuilder(
               builder: (context, setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                return ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   children: [
-                    Text('Edit Boete', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Edit Boete',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+                    const SizedBox(height: 10),
                     TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: amount,
                       decoration: const InputDecoration(labelText: 'Amount (€)'),
@@ -563,43 +439,36 @@ class _BoetesScreenState extends State<BoetesScreen> {
                     ),
                     if (error != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.only(top: 10),
                         child: Text(error!, style: const TextStyle(color: Colors.red)),
                       ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                        const SizedBox(width: 6),
-                        FilledButton(
-                          onPressed: () async {
-                            final t = title.text.trim();
-                            final d = desc.text.trim();
-                            final a = double.tryParse(amount.text.replaceAll(',', '.'));
-                            if (t.isEmpty || d.isEmpty || a == null) {
-                              setState(() => error = 'Please fill all fields with a valid amount.');
-                              return;
-                            }
-                            await _boeteService.updateBoete(
-                              id: b.id,
-                              title: t,
-                              description: d,
-                              amount: a,
-                              groupId: b.groupId,
-                            );
-                            if (!mounted) return;
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
+                    const SizedBox(height: 14),
+                    FilledButton(
+                      onPressed: () async {
+                        final t = title.text.trim();
+                        final d = desc.text.trim();
+                        final a = double.tryParse(amount.text.replaceAll(',', '.'));
+                        if (t.isEmpty || d.isEmpty || a == null) {
+                          setState(() => error = 'Please fill all fields with a valid amount.');
+                          return;
+                        }
+                        await _boeteService.updateBoete(
+                          id: b.id,
+                          title: t,
+                          description: d,
+                          amount: a,
+                          groupId: b.groupId,
+                        );
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Save'),
                     ),
                   ],
                 );
               },
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -622,127 +491,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     }
   }
 
-  Future<void> _showAddFromTemplates() async {
-    final gid = widget.groupId;
-    if (gid == null) return;
-    final selected = <String>{};
-    String assignee = widget.currentUid;
-    String? error;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-            left: 12,
-            right: 12,
-            top: 12,
-          ),
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Add from templates', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      initialValue: assignee,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Assign to'),
-                      items: widget.members.map((u) {
-                        final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
-                        return DropdownMenuItem(value: u.id, child: Text(label));
-                      }).toList(),
-                      onChanged: (v) => setState(() => assignee = v ?? assignee),
-                    ),
-                    const SizedBox(height: 12),
-                    StreamBuilder<List<BoeteTemplate>>(
-                      stream: _boeteService.watchTemplates(gid),
-                      builder: (context, snap) {
-                        if (!snap.hasData) return const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator());
-                        final templates = snap.data!;
-                        if (templates.isEmpty) {
-                          return Text('No templates yet', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary));
-                        }
-                        return Column(
-                          children: templates.map((tpl) {
-                            final checked = selected.contains(tpl.id);
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(tpl.title, style: const TextStyle(color: AppTheme.textPrimary)),
-                              subtitle: Text(tpl.description, style: const TextStyle(color: AppTheme.textSecondary)),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(_formatCurrency(tpl.amount), style: const TextStyle(color: AppTheme.textPrimary)),
-                                  const SizedBox(height: 4),
-                                  Icon(checked ? Icons.check_circle : Icons.circle_outlined, color: checked ? AppTheme.gold : AppTheme.textSecondary),
-                                ],
-                              ),
-                              onTap: () {
-                                setState(() {
-                                  if (checked) {
-                                    selected.remove(tpl.id);
-                                  } else {
-                                    selected.add(tpl.id);
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
-                        );
-                      },
-                    ),
-                    if (error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(error!, style: const TextStyle(color: Colors.red)),
-                      ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                        const SizedBox(width: 6),
-                        FilledButton(
-                          onPressed: () async {
-                            final templatesSnap = await _boeteService.watchTemplates(gid).first;
-                            final chosen = templatesSnap.where((t) => selected.contains(t.id)).toList();
-                            if (chosen.isEmpty) {
-                              setState(() => error = 'Select at least one template.');
-                              return;
-                            }
-                            final assigneeEmail = _memberByUid(assignee)?.email;
-                            await _boeteService.addBoetesFromTemplates(
-                              templates: chosen,
-                              assignedToUid: assignee,
-                              assignedToEmail: assigneeEmail,
-                              groupId: gid,
-                              createdByEmail: widget.currentUserEmail,
-                            );
-                            if (!mounted) return;
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _showCreatePotSheet() async {
     final name = TextEditingController();
     final emails = TextEditingController();
@@ -752,27 +500,34 @@ class _BoetesScreenState extends State<BoetesScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-            left: 12,
-            right: 12,
-            top: 12,
-          ),
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
+        return AppBottomSheet(
+          childBuilder: (sheetContext, scrollController) {
+            return StatefulBuilder(
               builder: (context, setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                return ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   children: [
-                    Text('Nieuwe BoetePot', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Nieuwe BoetePot',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: name,
                       decoration: const InputDecoration(labelText: 'Naam'),
                     ),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: emails,
                       decoration: const InputDecoration(labelText: 'Lid e-mails (comma separated)'),
@@ -821,8 +576,8 @@ class _BoetesScreenState extends State<BoetesScreen> {
                   ],
                 );
               },
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -851,9 +606,10 @@ class _BoeteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final child = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: AppCard(
+        radius: 22,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -868,11 +624,23 @@ class _BoeteRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(boete.title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+                  Text(
+                    boete.title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
-                  Text(boete.description, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
+                  Text(
+                    boete.description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 6),
-                  Text(_formatDate(boete.dateAdded), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontSize: 12)),
+                  Text(
+                    _formatDate(boete.dateAdded),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -894,27 +662,20 @@ class _BoeteRow extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
                   ),
                 ),
-                if (onEdit != null || onDelete != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (onEdit != null)
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18, color: AppTheme.textSecondary),
-                          onPressed: onEdit,
-                        ),
-                      if (onDelete != null)
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 18, color: Colors.redAccent),
-                          onPressed: onDelete,
-                        ),
-                    ],
-                  ),
               ],
             ),
           ],
         ),
       ),
+    );
+
+    if (onEdit == null && onDelete == null) return child;
+
+    return _SwipeReveal(
+      key: ValueKey('boete-${boete.id}'),
+      child: child,
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 
@@ -924,66 +685,151 @@ class _BoeteRow extends StatelessWidget {
   }
 }
 
-class _FabMenu extends StatelessWidget {
-  const _FabMenu({
-    required this.canAdd,
-    required this.onAddBoete,
-    required this.onAddFromTemplates,
-    required this.onCreatePot,
-    this.onManageTemplates,
+class _SwipeActionButton extends StatelessWidget {
+  const _SwipeActionButton({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
   });
 
-  final bool canAdd;
-  final VoidCallback onAddBoete;
-  final VoidCallback onAddFromTemplates;
-  final VoidCallback onCreatePot;
-  final VoidCallback? onManageTemplates;
+  final String label;
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Acties',
-      position: PopupMenuPosition.over,
-      onSelected: (v) {
-        switch (v) {
-          case 'add':
-            onAddBoete();
-            break;
-          case 'templates':
-            onAddFromTemplates();
-            break;
-          case 'createPot':
-            onCreatePot();
-            break;
-          case 'manageTemplates':
-            onManageTemplates?.call();
-            break;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 88,
+        height: 54,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.cardStroke, width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: foreground),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwipeReveal extends StatefulWidget {
+  const _SwipeReveal({
+    super.key,
+    required this.child,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Widget child;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  State<_SwipeReveal> createState() => _SwipeRevealState();
+}
+
+class _SwipeRevealState extends State<_SwipeReveal> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const double _buttonWidth = 88;
+  static const double _gap = 10;
+  static const double _reveal = (_buttonWidth * 2) + _gap;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 170));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _open() => _controller.animateTo(1, curve: Curves.easeOutCubic);
+  void _close() => _controller.animateTo(0, curve: Curves.easeOutCubic);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: (d) {
+        // drag left opens, drag right closes
+        final delta = -d.primaryDelta!;
+        final next = (_controller.value * _reveal + delta) / _reveal;
+        _controller.value = next.clamp(0.0, 1.0);
+      },
+      onHorizontalDragEnd: (_) {
+        if (_controller.value > 0.25) {
+          _open();
+        } else {
+          _close();
         }
       },
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          value: 'add',
-          enabled: canAdd,
-          child: const Text('Add Boete'),
-        ),
-        PopupMenuItem(
-          value: 'templates',
-          enabled: canAdd,
-          child: const Text('Add from Templates'),
-        ),
-        const PopupMenuItem(
-          value: 'createPot',
-          child: Text('New BoetePot'),
-        ),
-        if (onManageTemplates != null)
-          const PopupMenuItem(
-            value: 'manageTemplates',
-            child: Text('Manage Templates'),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SwipeActionButton(
+                      label: 'Edit',
+                      icon: Icons.edit,
+                      background: AppTheme.cardFill,
+                      foreground: AppTheme.textPrimary,
+                      onTap: () {
+                        widget.onEdit?.call();
+                        _close();
+                      },
+                    ),
+                    const SizedBox(width: _gap),
+                    _SwipeActionButton(
+                      label: 'Delete',
+                      icon: Icons.delete,
+                      background: Colors.red.withAlpha((0.22 * 255).round()),
+                      foreground: Colors.redAccent,
+                      onTap: () {
+                        widget.onDelete?.call();
+                        _close();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-      ],
-      child: const GoldFab(
-        onPressed: null,
-        icon: Icons.add,
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Transform.translate(
+                offset: Offset(-_controller.value * _reveal, 0),
+                child: widget.child,
+              );
+            },
+          ),
+        ],
       ),
     );
   }

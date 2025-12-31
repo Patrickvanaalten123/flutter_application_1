@@ -60,6 +60,16 @@ flutter:
   assets:
     - boetepot/assets/images/
 
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: boetepot/assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: boetepot/assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: boetepot/assets/fonts/Inter-Bold.ttf
+          weight: 700
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
