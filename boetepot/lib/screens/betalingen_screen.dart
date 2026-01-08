@@ -336,91 +336,106 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-            left: 12,
-            right: 12,
-            top: 12,
-          ),
-          child: AppCard(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(builder: (context, setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nieuwe betalingsronde', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('T/m datum', style: TextStyle(color: AppTheme.textPrimary)),
-                    subtitle: Text(_fmtDate(asOf), style: const TextStyle(color: AppTheme.textSecondary)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.date_range, color: AppTheme.textSecondary),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: asOf,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) setState(() => asOf = DateTime(picked.year, picked.month, picked.day));
-                      },
+        return AppBottomSheet(
+          childBuilder: (sheetContext, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Nieuwe betalingsronde',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                        ),
+                      ],
                     ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: includeZero,
-                    onChanged: (v) => setState(() => includeZero = v),
-                    title: const Text('Leden met €0 meenemen', style: TextStyle(color: AppTheme.textPrimary)),
-                  ),
-                  TextField(
-                    controller: note,
-                    decoration: const InputDecoration(labelText: 'Notitie (optioneel)'),
-                  ),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(error!, style: const TextStyle(color: Colors.red)),
-                    ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                      const SizedBox(width: 6),
-                      FilledButton(
-                        onPressed: () async {
-                          try {
-                            setState(() => error = null);
-                            setState(() => _loading = true);
-                            final me = FirebaseAuth.instance.currentUser!;
-                            final round = await _service.createRound(
-                              groupId: widget.groupId,
-                              asOf: asOf,
-                              note: note.text.trim().isEmpty ? null : note.text.trim(),
-                              includeZeroMembers: includeZero,
-                              currentUid: me.uid,
-                            );
-                            if (mounted) {
-                              Navigator.pop(context);
-                              setState(() => _selectedRound = round);
-                            }
-                          } catch (e) {
-                            setState(() => error = e.toString());
-                          } finally {
-                            if (mounted) setState(() => _loading = false);
-                          }
-                        },
-                        child: const Text('Aanmaken'),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'T/m datum',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
                       ),
-                    ],
-                  ),
-                ],
-              );
-            }),
-          ),
+                      subtitle: Text(_fmtDate(asOf), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.date_range, color: AppTheme.textSecondary),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: asOf,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) setState(() => asOf = DateTime(picked.year, picked.month, picked.day));
+                        },
+                      ),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: includeZero,
+                      onChanged: (v) => setState(() => includeZero = v),
+                      title: Text(
+                        'Leden met €0 meenemen',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: note,
+                      decoration: const InputDecoration(labelText: 'Notitie (optioneel)'),
+                    ),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(error!, style: const TextStyle(color: Colors.red)),
+                      ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                        const SizedBox(width: 6),
+                        FilledButton(
+                          onPressed: () async {
+                            try {
+                              setState(() => error = null);
+                              setState(() => _loading = true);
+                              final me = FirebaseAuth.instance.currentUser!;
+                              final round = await _service.createRound(
+                                groupId: widget.groupId,
+                                asOf: asOf,
+                                note: note.text.trim().isEmpty ? null : note.text.trim(),
+                                includeZeroMembers: includeZero,
+                                currentUid: me.uid,
+                              );
+                              if (mounted) {
+                                Navigator.pop(context);
+                                setState(() => _selectedRound = round);
+                              }
+                            } catch (e) {
+                              setState(() => error = e.toString());
+                            } finally {
+                              if (mounted) setState(() => _loading = false);
+                            }
+                          },
+                          child: const Text('Aanmaken'),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         );
       },
     );

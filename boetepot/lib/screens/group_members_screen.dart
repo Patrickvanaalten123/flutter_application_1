@@ -17,6 +17,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   Map<String, String> _roles = {};
   final _newMembersText = TextEditingController();
   String? _error;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -52,23 +53,34 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   children: [
                     const Spacer(),
                     FilledButton(
-                      onPressed: () async {
+                      onPressed: _busy
+                          ? null
+                          : () async {
                         final emails = _newMembersText.text
                             .split(',')
                             .map((e) => e.trim().toLowerCase())
                             .where((e) => e.isNotEmpty)
                             .toList();
+                        if (emails.isEmpty) return;
                         try {
+                          setState(() {
+                            _busy = true;
+                            _error = null;
+                          });
                           await _svc.addMembers(widget.groupId, emails);
                           setState(() {
                             _newMembersText.clear();
                             _error = null;
+                            _busy = false;
                           });
                         } catch (e) {
-                          setState(() => _error = e.toString());
+                          setState(() {
+                            _busy = false;
+                            _error = e.toString();
+                          });
                         }
                       },
-                      child: const Text('Add'),
+                      child: Text(_busy ? 'Adding…' : 'Add'),
                     )
                   ],
                 ),
@@ -87,10 +99,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               subtitle: Text('${u.email} • $role'),
               trailing: PopupMenuButton<String>(
                 onSelected: (v) async {
-                  if (v == 'admin' || v == 'boeteAssigner' || v == 'member') {
-                    await _svc.setRole(widget.groupId, u.id, v);
-                  } else if (v == 'remove') {
-                    await _svc.removeMember(widget.groupId, u.id);
+                  try {
+                    setState(() => _error = null);
+                    if (v == 'admin' || v == 'boeteAssigner' || v == 'member') {
+                      await _svc.setRole(widget.groupId, u.id, v);
+                    } else if (v == 'remove') {
+                      await _svc.removeMember(widget.groupId, u.id);
+                    }
+                  } catch (e) {
+                    if (!mounted) return;
+                    setState(() => _error = e.toString());
                   }
                 },
                 itemBuilder: (_) => const [

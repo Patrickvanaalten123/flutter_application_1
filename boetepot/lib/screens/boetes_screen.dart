@@ -322,6 +322,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
   }
 
   Widget _myCard(List<Boete> items) {
+    final me = _memberByUid(widget.currentUid);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AppCard(
@@ -329,7 +330,11 @@ class _BoetesScreenState extends State<BoetesScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            AvatarCircle(title: widget.currentUserEmail, size: 40),
+            UserAvatar(
+              title: me?.displayName ?? widget.currentUserEmail,
+              photoUrl: me?.photoURL,
+              size: 40,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -370,7 +375,10 @@ class _BoetesScreenState extends State<BoetesScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    AvatarCircle(title: user?.displayName ?? user?.email ?? 'U'),
+                    UserAvatar(
+                      title: user?.displayName ?? user?.email ?? 'U',
+                      photoUrl: user?.photoURL,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -608,63 +616,65 @@ class _BoeteRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final child = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: AppCard(
-        radius: 22,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            assignee?.photoURL != null && assignee!.photoURL!.isNotEmpty
-                ? CircleAvatar(
-                    radius: 18,
-                    backgroundImage: NetworkImage(assignee!.photoURL!),
-                  )
-                : AvatarCircle(title: assignee?.displayName ?? assignee?.email ?? boete.title, size: 38),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: SizedBox(
+        width: double.infinity,
+        child: AppCard(
+          radius: 22,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UserAvatar(
+                title: assignee?.displayName ?? assignee?.email ?? boete.title,
+                photoUrl: assignee?.photoURL,
+                size: 38,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      boete.title,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      boete.description,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _formatDate(boete.dateAdded),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    boete.title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    boete.description,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _formatDate(boete.dateAdded),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontSize: 12),
+                  if (_assigneeLabel.isNotEmpty) AppPill(text: _assigneeLabel),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.gold.withAlpha((0.14 * 255).round()),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.cardStroke, width: 1),
+                    ),
+                    child: Text(
+                      '€${boete.amount.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (_assigneeLabel.isNotEmpty) AppPill(text: _assigneeLabel),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.gold.withAlpha((0.14 * 255).round()),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.cardStroke, width: 1),
-                  ),
-                  child: Text(
-                    '€${boete.amount.toStringAsFixed(2)}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -787,37 +797,49 @@ class _SwipeRevealState extends State<_SwipeReveal> with SingleTickerProviderSta
       child: Stack(
         children: [
           Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _SwipeActionButton(
-                      label: 'Edit',
-                      icon: Icons.edit,
-                      background: AppTheme.cardFill,
-                      foreground: AppTheme.textPrimary,
-                      onTap: () {
-                        widget.onEdit?.call();
-                        _close();
-                      },
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final reveal = _controller.value.clamp(0.0, 1.0);
+                return IgnorePointer(
+                  ignoring: reveal < 0.02,
+                  child: Opacity(
+                    opacity: reveal,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _SwipeActionButton(
+                              label: 'Edit',
+                              icon: Icons.edit,
+                              background: AppTheme.cardFill,
+                              foreground: AppTheme.textPrimary,
+                              onTap: () {
+                                widget.onEdit?.call();
+                                _close();
+                              },
+                            ),
+                            const SizedBox(width: _gap),
+                            _SwipeActionButton(
+                              label: 'Delete',
+                              icon: Icons.delete,
+                              background: Colors.red.withAlpha((0.22 * 255).round()),
+                              foreground: Colors.redAccent,
+                              onTap: () {
+                                widget.onDelete?.call();
+                                _close();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: _gap),
-                    _SwipeActionButton(
-                      label: 'Delete',
-                      icon: Icons.delete,
-                      background: Colors.red.withAlpha((0.22 * 255).round()),
-                      foreground: Colors.redAccent,
-                      onTap: () {
-                        widget.onDelete?.call();
-                        _close();
-                      },
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
           AnimatedBuilder(

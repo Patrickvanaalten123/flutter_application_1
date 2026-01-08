@@ -1,9 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../services/group_service.dart';
 import '../services/boete_service.dart';
+import '../services/notifications_service.dart';
 import '../models.dart';
 import '../ui.dart';
 
@@ -30,6 +33,25 @@ class _HomeShellState extends State<HomeShell> {
   List<AppUser> _currentMembers = [];
   final _boeteService = BoeteService();
   final GlobalKey _fabKey = GlobalKey();
+
+  void _selectGroup({
+    required String uid,
+    required String id,
+    required String name,
+    bool closePicker = false,
+  }) {
+    setState(() {
+      _selectedGroupId = id;
+      _selectedGroupName = name;
+    });
+    _startMembersWatch(id);
+    unawaited(
+      NotificationsService.syncForGroup(uid: uid, groupId: id).catchError((_) {
+        // Best-effort; user may have notifications disabled at OS level.
+      }),
+    );
+    if (closePicker) Navigator.pop(context);
+  }
 
   Future<void> _showCreatePotSheet() async {
     final name = TextEditingController();
@@ -104,11 +126,11 @@ class _HomeShellState extends State<HomeShell> {
                             setState(() => error = null);
                             if (!mounted) return;
                             Navigator.pop(context);
-                            setState(() {
-                              _selectedGroupId = newId;
-                              _selectedGroupName = n;
-                            });
-                            _startMembersWatch(newId);
+                            _selectGroup(
+                              uid: FirebaseAuth.instance.currentUser!.uid,
+                              id: newId,
+                              name: n,
+                            );
                           } catch (e) {
                             setState(() => error = e.toString());
                           }
@@ -137,12 +159,9 @@ class _HomeShellState extends State<HomeShell> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: GroupsScreen(
             onSelect: (id, name) {
-              setState(() {
-                _selectedGroupId = id;
-                _selectedGroupName = name;
-              });
-              _startMembersWatch(id);
-              Navigator.pop(context);
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              if (uid == null) return;
+              _selectGroup(uid: uid, id: id, name: name, closePicker: true);
             },
           ),
         ),
@@ -258,6 +277,8 @@ class _HomeShellState extends State<HomeShell> {
     final selected = <String>{};
     String assignee = FirebaseAuth.instance.currentUser?.uid ?? '';
     String? error;
+    List<BoeteTemplate> latestTemplates = const [];
+    final templatesStream = _boeteService.watchTemplates(_selectedGroupId!);
 
     await showModalBottomSheet(
       context: context,
@@ -298,8 +319,29 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                   const SizedBox(height: 12),
                   StreamBuilder<List<BoeteTemplate>>(
-                    stream: _boeteService.watchTemplates(_selectedGroupId!),
+                    stream: templatesStream,
                     builder: (context, snap) {
+                      if (snap.hasError) {
+                        return Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: AppCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Kon templates niet laden',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  snap.error.toString(),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
                       if (!snap.hasData) {
                         return const Padding(
                           padding: EdgeInsets.all(8),
@@ -307,6 +349,7 @@ class _HomeShellState extends State<HomeShell> {
                         );
                       }
                       final templates = snap.data!;
+                      latestTemplates = templates;
                       if (templates.isEmpty) {
                         return Text('No templates yet', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary));
                       }
@@ -352,8 +395,11 @@ class _HomeShellState extends State<HomeShell> {
                       const SizedBox(width: 6),
                       FilledButton(
                         onPressed: () async {
-                          final templatesSnap = await _boeteService.watchTemplates(_selectedGroupId!).first;
-                          final chosen = templatesSnap.where((t) => selected.contains(t.id)).toList();
+                          if (selected.isEmpty) {
+                            setState(() => error = 'Select at least one template.');
+                            return;
+                          }
+                          final chosen = latestTemplates.where((t) => selected.contains(t.id)).toList();
                           if (chosen.isEmpty) {
                             setState(() => error = 'Select at least one template.');
                             return;
@@ -530,11 +576,7 @@ class _HomeShellState extends State<HomeShell> {
     if (_selectedGroupId == null) {
       return GroupsScreen(
         onSelect: (id, name) {
-          setState(() {
-            _selectedGroupId = id;
-            _selectedGroupName = name;
-          });
-          _startMembersWatch(id);
+          _selectGroup(uid: user.uid, id: id, name: name);
         },
       );
     }
@@ -548,11 +590,7 @@ class _HomeShellState extends State<HomeShell> {
       roleLabel: _currentRoles[user.uid],
       onRequestGroupPicker: _openGroupPicker,
       onGroupCreated: (id, name) {
-        setState(() {
-          _selectedGroupId = id;
-          _selectedGroupName = name;
-        });
-        _startMembersWatch(id);
+        _selectGroup(uid: user.uid, id: id, name: name);
       },
     );
   }
@@ -561,11 +599,7 @@ class _HomeShellState extends State<HomeShell> {
     if (_selectedGroupId == null) {
       return GroupsScreen(
         onSelect: (id, name) {
-          setState(() {
-            _selectedGroupId = id;
-            _selectedGroupName = name;
-          });
-          _startMembersWatch(id);
+          _selectGroup(uid: user.uid, id: id, name: name);
         },
       );
     }
@@ -581,11 +615,7 @@ class _HomeShellState extends State<HomeShell> {
     if (_selectedGroupId == null) {
       return GroupsScreen(
         onSelect: (id, name) {
-          setState(() {
-            _selectedGroupId = id;
-            _selectedGroupName = name;
-          });
-          _startMembersWatch(id);
+          _selectGroup(uid: user.uid, id: id, name: name);
         },
       );
     }
@@ -596,22 +626,12 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Widget _buildProfileTab(User user) {
-    return Column(
-      children: [
-        Expanded(
-          child: GroupsScreen(
-            onSelect: (id, name) {
-              setState(() {
-                _selectedGroupId = id;
-                _selectedGroupName = name;
-              });
-              _startMembersWatch(id);
-            },
-          ),
-        ),
-        const Divider(height: 1),
-        const Expanded(child: ProfileScreen()),
-      ],
+    return ProfileScreen(
+      groupId: _selectedGroupId,
+      groupName: _selectedGroupName,
+      roleLabel: _currentRoles[user.uid],
+      isAdminHere: _currentRoles[user.uid] == 'admin',
+      onPickGroup: _openGroupPicker,
     );
   }
 

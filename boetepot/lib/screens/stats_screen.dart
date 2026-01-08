@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/payment_round_service.dart';
 import '../services/boete_service.dart';
 import '../services/group_service.dart';
@@ -81,6 +82,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ..sort((a, b) => b.value.compareTo(a.value)),
                 labelFor: (uid) => _label(uid, memberByUid),
                 valueFor: (uid) => _formatCurrency(_paidTotals[uid] ?? 0),
+                photoFor: (uid) => memberByUid[uid]?.photoURL,
               ),
               const SizedBox(height: 10),
               _listCard(
@@ -89,6 +91,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ..sort((a, b) => b.value.compareTo(a.value)),
                 labelFor: (uid) => _label(uid, memberByUid),
                 valueFor: (uid) => '${countsByUser[uid] ?? 0}',
+                photoFor: (uid) => memberByUid[uid]?.photoURL,
               ),
               const SizedBox(height: 10),
               _listCard(
@@ -96,6 +99,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 rows: sortedTotals,
                 labelFor: (uid) => _label(uid, memberByUid),
                 valueFor: (uid) => _formatCurrency(totalsByUser[uid] ?? 0),
+                photoFor: (uid) => memberByUid[uid]?.photoURL,
               ),
               const SizedBox(height: 10),
               _largestCard(largestBoete, memberByUid),
@@ -130,10 +134,16 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Widget _myCard(double outstanding, double paid) {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final me = _members.firstWhere((m) => m.id == widget.currentUid, orElse: () => AppUser(id: widget.currentUid, email: email));
+    final title = me.displayName ?? email;
     return AppCard(
       child: Row(
         children: [
-          const AvatarCircle(title: 'J'),
+          UserAvatar(
+            title: title.isNotEmpty ? title : 'J',
+            photoUrl: me.photoURL,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -155,6 +165,7 @@ class _StatsScreenState extends State<StatsScreen> {
     required List<MapEntry<String, dynamic>> rows,
     required String Function(String uid) labelFor,
     required String Function(String uid) valueFor,
+    String? Function(String uid)? photoFor,
   }) {
     return AppCard(
       child: Column(
@@ -171,7 +182,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    AvatarCircle(title: labelFor(uid)),
+                    UserAvatar(
+                      title: labelFor(uid),
+                      photoUrl: photoFor?.call(uid),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(labelFor(uid), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
@@ -205,7 +219,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    AvatarCircle(title: _label(boete.assignedToUid, memberByUid)),
+                    UserAvatar(
+                      title: _label(boete.assignedToUid, memberByUid),
+                      photoUrl: memberByUid[boete.assignedToUid]?.photoURL,
+                    ),
                     const SizedBox(width: 8),
                     Text(_label(boete.assignedToUid, memberByUid), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
                     const Spacer(),

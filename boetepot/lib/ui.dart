@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Palette and shared UI widgets to mirror the SwiftUI `AppUI` look.
 class AppTheme {
@@ -214,6 +215,58 @@ class AvatarCircle extends StatelessWidget {
               color: AppTheme.gold,
             ),
       ),
+    );
+  }
+}
+
+class UserAvatar extends StatelessWidget {
+  const UserAvatar({
+    super.key,
+    required this.title,
+    this.photoUrl,
+    this.size = 34,
+  });
+
+  final String title;
+  final String? photoUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedTitle = title.trim();
+    final letter = trimmedTitle.isNotEmpty ? trimmedTitle[0].toUpperCase() : '?';
+
+    Widget fallback() {
+      return Center(
+        child: Text(
+          letter,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.gold,
+              ),
+        ),
+      );
+    }
+
+    final url = photoUrl?.trim();
+    return Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.cardFill,
+        border: Border.all(color: AppTheme.cardStroke, width: 1),
+      ),
+      child: (url != null && url.isNotEmpty)
+          ? Image(
+              image: CachedNetworkImageProvider(url),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => fallback(),
+            )
+          : fallback(),
     );
   }
 }

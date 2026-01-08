@@ -110,6 +110,30 @@ class BoetePotGroup {
   }
 }
 
+class GroupLink {
+  final String groupId;
+  final String name;
+  final String? role;
+  final int? memberCount;
+
+  GroupLink({
+    required this.groupId,
+    required this.name,
+    this.role,
+    this.memberCount,
+  });
+
+  factory GroupLink.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    return GroupLink(
+      groupId: doc.id,
+      name: (d['name'] as String?) ?? '',
+      role: d['role'] as String?,
+      memberCount: (d['memberCount'] as num?)?.toInt(),
+    );
+  }
+}
+
 class Boete {
   final String id;
   final String groupId;

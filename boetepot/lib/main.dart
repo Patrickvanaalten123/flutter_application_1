@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/home_shell.dart';
 import 'services/user_service.dart';
+import 'services/migration_service.dart';
 import 'ui.dart';
 
 void main() async {
@@ -34,6 +35,9 @@ class BoetePotApp extends StatelessWidget {
           } else {
             // Ensure we have a user doc
             UserService.ensureUserDoc(user);
+            // One-time migration: backfill `userGroups/{uid}/groups/*` links.
+            // This makes groups listing rules-safe (no membership list queries).
+            MigrationService.ensureUserGroupLinks(user.uid);
             return const HomeShell();
           }
         },

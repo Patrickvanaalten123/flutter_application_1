@@ -22,6 +22,8 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
   String? _selectedUid;
   final Set<String> _selectedTemplateIds = {};
   String? _error;
+  List<BoeteTemplate> _latestTemplates = const [];
+  late final Stream<List<BoeteTemplate>> _templatesStream;
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
     if (widget.members.isNotEmpty) {
       _selectedUid = widget.members.first.id;
     }
+    _templatesStream = _service.watchTemplates(widget.groupId);
   }
 
   @override
@@ -60,10 +63,22 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
           ),
           Expanded(
             child: StreamBuilder<List<BoeteTemplate>>(
-              stream: _service.watchTemplates(widget.groupId),
+              stream: _templatesStream,
               builder: (context, snap) {
+                if (snap.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Kon templates niet laden:\n${snap.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
                 if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                 final items = snap.data!;
+                _latestTemplates = items;
                 if (items.isEmpty) return const Center(child: Text('No templates'));
                 return ListView.separated(
                   itemCount: items.length,
@@ -114,10 +129,18 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
                   setState(() => _error = 'Select a member');
                   return;
                 }
-                final templates = await _service.watchTemplates(widget.groupId).first;
-                final chosen = templates.where((t) => _selectedTemplateIds.contains(t.id)).toList();
+                if (_selectedTemplateIds.isEmpty) {
+                  setState(() => _error = 'Selecteer minimaal één template');
+                  return;
+                }
                 final assignee = widget.members.firstWhere((u) => u.id == _selectedUid, orElse: () => AppUser(id: _selectedUid!, email: _selectedUid!));
                 try {
+                  final templates = _latestTemplates.isNotEmpty ? _latestTemplates : await _service.fetchTemplatesOnce(widget.groupId);
+                  final chosen = templates.where((t) => _selectedTemplateIds.contains(t.id)).toList();
+                  if (chosen.isEmpty) {
+                    setState(() => _error = 'Geen templates geselecteerd');
+                    return;
+                  }
                   await _service.addBoetesFromTemplates(
                     templates: chosen,
                     assignedToUid: _selectedUid!,

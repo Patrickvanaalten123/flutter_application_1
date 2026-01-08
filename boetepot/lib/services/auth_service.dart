@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'user_service.dart';
+import 'notifications_service.dart';
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
@@ -24,7 +25,10 @@ class AuthService {
     await _ensureAdminField(cred.user);
   }
 
-  static Future<void> signOut() => _auth.signOut();
+  static Future<void> signOut() async {
+    await NotificationsService.cleanupOnSignOut();
+    await _auth.signOut();
+  }
 
   static Stream<bool> watchIsAdmin(String uid) {
     return _db.collection('users').doc(uid).snapshots().map((doc) {

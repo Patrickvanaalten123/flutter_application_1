@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../models.dart';
 
 class BoeteService {
@@ -58,13 +59,52 @@ class BoeteService {
 
   // Templates
   Stream<List<BoeteTemplate>> watchTemplates(String groupId) {
-    return _db
-        .collection('boeteTemplates')
-        .where('groupId', isEqualTo: groupId)
-        .where('isActive', isEqualTo: true)
-        .orderBy('title')
-        .snapshots()
-        .map((snap) => snap.docs.map((d) => BoeteTemplate.fromDoc(d)).toList());
+    final controller = StreamController<List<BoeteTemplate>>();
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sub;
+
+    void emitFromSnapshot(QuerySnapshot<Map<String, dynamic>> snap, {required bool sortByTitle}) {
+      final items = snap.docs.map((d) => BoeteTemplate.fromDoc(d)).where((t) => t.isActive).toList();
+      if (sortByTitle) {
+        items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      }
+      controller.add(items);
+    }
+
+    void listenTo({
+      required Query<Map<String, dynamic>> query,
+      required bool sortByTitle,
+      required bool allowFallbackOnIndexError,
+    }) {
+      sub?.cancel();
+      sub = query.snapshots().listen(
+        (snap) => emitFromSnapshot(snap, sortByTitle: sortByTitle),
+        onError: (Object err, StackTrace st) {
+          final isIndexError = err is FirebaseException && err.code == 'failed-precondition';
+          if (allowFallbackOnIndexError && isIndexError) {
+            listenTo(
+              query: _db.collection('boeteTemplates').where('groupId', isEqualTo: groupId),
+              sortByTitle: true,
+              allowFallbackOnIndexError: false,
+            );
+            return;
+          }
+          controller.addError(err, st);
+        },
+      );
+    }
+
+    listenTo(
+      query: _db
+          .collection('boeteTemplates')
+          .where('groupId', isEqualTo: groupId)
+          .where('isActive', isEqualTo: true)
+          .orderBy('title'),
+      sortByTitle: false,
+      allowFallbackOnIndexError: true,
+    );
+
+    controller.onCancel = () => sub?.cancel();
+    return controller.stream;
   }
 
   Future<void> createTemplate({

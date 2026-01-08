@@ -4,11 +4,59 @@ import '../models.dart';
 class GroupService {
   final _db = FirebaseFirestore.instance;
 
-  Stream<List<BoetePotGroup>> watchGroupsFor(String uid) {
-    final base = _db.collection('groups').where('members', arrayContains: uid);
-    return base.orderBy('name').snapshots().map(
-          (snap) => snap.docs.map((d) => BoetePotGroup.fromDoc(d)).toList(),
-        );
+  /// Robust group listing: read from `userGroups/{uid}/groups/*` to avoid
+  /// Firestore rules/queries issues with membership-based `list`.
+  Stream<List<GroupLink>> watchGroupsFor(String uid) {
+    final col = _db.collection('userGroups').doc(uid).collection('groups');
+    return col.snapshots().map((snap) {
+      final items = snap.docs
+          .where((d) => d.id != '_meta')
+          .map((d) => GroupLink.fromDoc(d))
+          .toList();
+      items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return items;
+    });
+  }
+
+  DocumentReference<Map<String, dynamic>> _metaRef(String uid) {
+    return _db.collection('userGroups').doc(uid).collection('groups').doc('_meta');
+  }
+
+  Future<bool> hasMigratedLinks(String uid) async {
+    final snap = await _metaRef(uid).get();
+    return snap.exists == true;
+  }
+
+  Future<void> markLinksMigrated(String uid) async {
+    await _metaRef(uid).set(
+      {
+        'migratedAt': FieldValue.serverTimestamp(),
+        'version': 1,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> upsertUserGroupLink({
+    required String uid,
+    required String groupId,
+    required String name,
+    required String role,
+    required int memberCount,
+    WriteBatch? batch,
+  }) async {
+    final ref = _db.collection('userGroups').doc(uid).collection('groups').doc(groupId);
+    final data = <String, dynamic>{
+      'name': name,
+      'role': role,
+      'memberCount': memberCount,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (batch != null) {
+      batch.set(ref, data, SetOptions(merge: true));
+    } else {
+      await ref.set(data, SetOptions(merge: true));
+    }
   }
 
   Future<String> createGroup({
@@ -35,13 +83,29 @@ class GroupService {
     }
 
     final ref = _db.collection('groups').doc();
-    await ref.set({
+    final batch = _db.batch();
+    batch.set(ref, {
       'name': name,
       'members': memberUids.toList(),
       'roles': roles,
       'createdAt': Timestamp.now(),
       'createdBy': currentUid,
     });
+
+    final memberCount = memberUids.length;
+    for (final uid in memberUids) {
+      final role = roles[uid] ?? 'member';
+      await upsertUserGroupLink(
+        uid: uid,
+        groupId: ref.id,
+        name: name,
+        role: role,
+        memberCount: memberCount,
+        batch: batch,
+      );
+    }
+
+    await batch.commit();
     return ref.id;
   }
 
@@ -115,18 +179,42 @@ class GroupService {
     }
 
     final ref = _db.collection('groups').doc(groupId);
-    await ref.update({
+    // Fetch group name for link docs (best-effort).
+    final groupSnap = await ref.get();
+    final gName = (groupSnap.data()?['name'] as String?) ?? 'BoetePot';
+    final currentMembers = (groupSnap.data()?['members'] as List?)?.length ?? 0;
+    final newMemberCount = currentMembers + uids.length;
+
+    final batch = _db.batch();
+    batch.update(ref, {
       'members': FieldValue.arrayUnion(uids),
       ...updates,
     });
+
+    for (final uid in uids) {
+      await upsertUserGroupLink(
+        uid: uid,
+        groupId: groupId,
+        name: gName,
+        role: 'member',
+        memberCount: newMemberCount,
+        batch: batch,
+      );
+    }
+
+    await batch.commit();
   }
 
   Future<void> removeMember(String groupId, String uid) async {
     final ref = _db.collection('groups').doc(groupId);
-    await ref.update({
+    final batch = _db.batch();
+    batch.update(ref, {
       'members': FieldValue.arrayRemove([uid]),
       'roles.$uid': FieldValue.delete(),
     });
+    final linkRef = _db.collection('userGroups').doc(uid).collection('groups').doc(groupId);
+    batch.delete(linkRef);
+    await batch.commit();
   }
 
   Future<void> setRole(String groupId, String uid, String role) async {
@@ -135,6 +223,45 @@ class GroupService {
       throw Exception('Invalid role');
     }
     final ref = _db.collection('groups').doc(groupId);
-    await ref.update({'roles.$uid': role});
+    final groupSnap = await ref.get();
+    final gName = (groupSnap.data()?['name'] as String?) ?? 'BoetePot';
+    final memberCount = (groupSnap.data()?['members'] as List?)?.length ?? 0;
+
+    final batch = _db.batch();
+    batch.update(ref, {'roles.$uid': role});
+    await upsertUserGroupLink(
+      uid: uid,
+      groupId: groupId,
+      name: gName,
+      role: role,
+      memberCount: memberCount,
+      batch: batch,
+    );
+    await batch.commit();
+  }
+
+  /// One-time migration helper: while `/groups` is still readable, create missing
+  /// `userGroups/{uid}/groups/{groupId}` docs for the current user.
+  Future<void> migrateLinksForUser(String uid) async {
+    final groupsSnap = await _db.collection('groups').where('members', arrayContains: uid).get();
+    if (groupsSnap.docs.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final d in groupsSnap.docs) {
+      final data = d.data();
+      final name = (data['name'] as String?) ?? '';
+      final roles = (data['roles'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? <String, String>{};
+      final role = roles[uid] ?? 'member';
+      final memberCount = (data['members'] as List?)?.length ?? 0;
+      await upsertUserGroupLink(
+        uid: uid,
+        groupId: d.id,
+        name: name,
+        role: role,
+        memberCount: memberCount,
+        batch: batch,
+      );
+    }
+    await batch.commit();
   }
 }
