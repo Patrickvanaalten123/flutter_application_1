@@ -21,9 +21,9 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() { _busy = true; _error = null; });
     try {
       if (_isRegister) {
-        await AuthService.register(_email.text.trim(), _password.text, displayName: _displayName.text.trim());
+        await AuthService.register(_email.text.trim().toLowerCase(), _password.text, displayName: _displayName.text.trim());
       } else {
-        await AuthService.signIn(_email.text.trim(), _password.text);
+        await AuthService.signIn(_email.text.trim().toLowerCase(), _password.text);
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message);
@@ -37,7 +37,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('BoetePot – Sign in')),
+      appBar: AppBar(title: const Text('BoetePot – Inloggen')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -49,16 +49,16 @@ class _SignInScreenState extends State<SignInScreen> {
                 if (_isRegister)
                   TextField(
                     controller: _displayName,
-                    decoration: const InputDecoration(labelText: 'Display name'),
+                    decoration: const InputDecoration(labelText: 'Weergavenaam'),
                   ),
                 TextField(
                   controller: _email,
-                  decoration: const InputDecoration(labelText: 'Email'),
+                  decoration: const InputDecoration(labelText: 'E-mailadres'),
                   keyboardType: TextInputType.emailAddress,
                 ),
                 TextField(
                   controller: _password,
-                  decoration: const InputDecoration(labelText: 'Password'),
+                  decoration: const InputDecoration(labelText: 'Wachtwoord'),
                   obscureText: true,
                 ),
                 const SizedBox(height: 12),
@@ -66,11 +66,11 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: _busy ? null : _submit,
-                  child: Text(_isRegister ? 'Create account' : 'Sign in'),
+                  child: Text(_isRegister ? 'Account aanmaken' : 'Inloggen'),
                 ),
                 TextButton(
                   onPressed: _busy ? null : () => setState(() => _isRegister = !_isRegister),
-                  child: Text(_isRegister ? 'Have an account? Sign in' : 'No account? Register'),
+                  child: Text(_isRegister ? 'Heb je al een account? Log in' : 'Nog geen account? Registreren'),
                 )
               ],
             ),

@@ -46,7 +46,7 @@ class _HomeShellState extends State<HomeShell> {
     });
     _startMembersWatch(id);
     unawaited(
-      NotificationsService.syncForGroup(uid: uid, groupId: id).catchError((_) {
+      NotificationsService.sync(uid: uid, groupId: id).catchError((_) {
         // Best-effort; user may have notifications disabled at OS level.
       }),
     );
@@ -101,9 +101,9 @@ class _HomeShellState extends State<HomeShell> {
                     ),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: () async {
@@ -118,11 +118,13 @@ class _HomeShellState extends State<HomeShell> {
                               .where((e) => e.isNotEmpty)
                               .toList();
                           try {
-                            final newId = await GroupService().createGroup(
+                            final res = await GroupService().createGroup(
                               name: n,
                               currentUid: FirebaseAuth.instance.currentUser!.uid,
                               memberEmails: emailList,
                             );
+                            final newId = res.groupId;
+                            final blocked = res.blockedEmails;
                             setState(() => error = null);
                             if (!mounted) return;
                             Navigator.pop(context);
@@ -131,11 +133,18 @@ class _HomeShellState extends State<HomeShell> {
                               id: newId,
                               name: n,
                             );
+                            if (blocked.isNotEmpty && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Niet toegevoegd (geen account): ${blocked.join(', ')}'),
+                                ),
+                              );
+                            }
                           } catch (e) {
                             setState(() => error = e.toString());
                           }
                         },
-                        child: const Text('Create'),
+                        child: const Text('Aanmaken'),
                       ),
                     ],
                   ),
@@ -192,8 +201,8 @@ class _HomeShellState extends State<HomeShell> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          'Add Boete',
+                          child: Text(
+                          'Boete toevoegen',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -204,20 +213,20 @@ class _HomeShellState extends State<HomeShell> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+                  TextField(controller: title, decoration: const InputDecoration(labelText: 'Titel')),
                   const SizedBox(height: 10),
-                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Omschrijving')),
                   const SizedBox(height: 10),
                   TextField(
                     controller: amount,
-                    decoration: const InputDecoration(labelText: 'Amount (€)'),
+                    decoration: const InputDecoration(labelText: 'Bedrag (€)'),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedUid,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Assign to'),
+                    decoration: const InputDecoration(labelText: 'Toewijzen aan'),
                     items: _currentMembers.map((u) {
                       final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
                       return DropdownMenuItem(value: u.id, child: Text(label));
@@ -233,7 +242,7 @@ class _HomeShellState extends State<HomeShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                       const SizedBox(width: 6),
                       FilledButton(
                         onPressed: () async {
@@ -241,7 +250,7 @@ class _HomeShellState extends State<HomeShell> {
                           final d = desc.text.trim();
                           final a = double.tryParse(amount.text.replaceAll(',', '.'));
                           if (t.isEmpty || d.isEmpty || a == null) {
-                            setState(() => error = 'Please fill all fields with a valid amount.');
+                            setState(() => error = 'Vul alle velden in met een geldig bedrag.');
                             return;
                           }
                           final assigneeEmail = _currentMembers
@@ -259,7 +268,7 @@ class _HomeShellState extends State<HomeShell> {
                           if (!mounted) return;
                           Navigator.pop(context);
                         },
-                        child: const Text('Add'),
+                        child: const Text('Toevoegen'),
                       ),
                     ],
                   ),
@@ -295,8 +304,8 @@ class _HomeShellState extends State<HomeShell> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          'Add from templates',
+                          child: Text(
+                          'Toevoegen uit sjablonen',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -310,7 +319,7 @@ class _HomeShellState extends State<HomeShell> {
                   DropdownButtonFormField<String>(
                     initialValue: assignee,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Assign to'),
+                    decoration: const InputDecoration(labelText: 'Toewijzen aan'),
                     items: _currentMembers.map((u) {
                       final label = (u.displayName?.isNotEmpty == true) ? u.displayName! : u.email;
                       return DropdownMenuItem(value: u.id, child: Text(label));
@@ -329,7 +338,7 @@ class _HomeShellState extends State<HomeShell> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Kon templates niet laden',
+                                  'Kon sjablonen niet laden',
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 6),
@@ -351,7 +360,7 @@ class _HomeShellState extends State<HomeShell> {
                       final templates = snap.data!;
                       latestTemplates = templates;
                       if (templates.isEmpty) {
-                        return Text('No templates yet', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary));
+                        return Text('Nog geen sjablonen', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary));
                       }
                       return Column(
                         children: templates.map((tpl) {
@@ -391,17 +400,17 @@ class _HomeShellState extends State<HomeShell> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                       const SizedBox(width: 6),
                       FilledButton(
                         onPressed: () async {
                           if (selected.isEmpty) {
-                            setState(() => error = 'Select at least one template.');
+                            setState(() => error = 'Selecteer minimaal één sjabloon.');
                             return;
                           }
                           final chosen = latestTemplates.where((t) => selected.contains(t.id)).toList();
                           if (chosen.isEmpty) {
-                            setState(() => error = 'Select at least one template.');
+                            setState(() => error = 'Selecteer minimaal één sjabloon.');
                             return;
                           }
                           final assigneeEmail = _currentMembers
@@ -417,7 +426,7 @@ class _HomeShellState extends State<HomeShell> {
                           if (!mounted) return;
                           Navigator.pop(context);
                         },
-                        child: const Text('Add'),
+                        child: const Text('Toevoegen'),
                       ),
                     ],
                   ),
@@ -448,15 +457,15 @@ class _HomeShellState extends State<HomeShell> {
         PopupMenuItem(
           value: 'addBoete',
           enabled: _selectedGroupId != null,
-          child: const Text('Add Boete'),
+          child: const Text('Boete toevoegen'),
         ),
         PopupMenuItem(
           value: 'addFromTemplates',
           enabled: _selectedGroupId != null,
-          child: const Text('Add from Templates'),
+          child: const Text('Toevoegen uit sjablonen'),
         ),
         if (isAdmin && _selectedGroupId != null)
-          const PopupMenuItem(value: 'manageTemplates', child: Text('Manage Templates')),
+          const PopupMenuItem(value: 'manageTemplates', child: Text('Sjablonen beheren')),
       ],
     );
 
@@ -786,7 +795,7 @@ class _HeaderRow extends StatelessWidget {
           _circleButton(
             context,
             icon: Icons.description,
-            tooltip: 'Templates',
+            tooltip: 'Sjablonen',
             onTap: onOpenTemplates!,
           ),
         if (onOpenMembers != null) const SizedBox(width: 8),
@@ -794,14 +803,14 @@ class _HeaderRow extends StatelessWidget {
           _circleButton(
             context,
             icon: Icons.group,
-            tooltip: 'Members',
+            tooltip: 'Leden',
             onTap: onOpenMembers!,
           ),
         const SizedBox(width: 8),
         _circleButton(
           context,
           icon: Icons.logout,
-          tooltip: 'Sign out',
+          tooltip: 'Uitloggen',
           onTap: onSignOut,
         ),
       ],

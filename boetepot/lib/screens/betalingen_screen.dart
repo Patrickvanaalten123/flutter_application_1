@@ -402,7 +402,7 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                         const SizedBox(width: 6),
                         FilledButton(
                           onPressed: () async {

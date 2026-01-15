@@ -170,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     currentPassword: currentPasswordForEmail.text,
                                   );
                                 }),
-                        child: const Text('Update e-mail'),
+                        child: const Text('E-mail bijwerken'),
                       ),
                     ],
                   ),
@@ -213,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   newPassword.clear();
                                   confirmNewPassword.clear();
                                 }),
-                        child: const Text('Update wachtwoord'),
+                        child: const Text('Wachtwoord bijwerken'),
                       ),
                     ],
                   ),

@@ -61,11 +61,15 @@ class AppUser {
 
 class UserPreferences {
   final bool notificationsEnabled;
+  final bool paymentRoundNotificationsEnabled;
+  final bool boeteNotificationsEnabled;
   final String? locale;
   final String? currencyCode;
 
   const UserPreferences({
     this.notificationsEnabled = true,
+    this.paymentRoundNotificationsEnabled = true,
+    this.boeteNotificationsEnabled = true,
     this.locale,
     this.currencyCode = 'EUR',
   });
@@ -74,6 +78,8 @@ class UserPreferences {
     final m = map ?? const <String, dynamic>{};
     return UserPreferences(
       notificationsEnabled: (m['notificationsEnabled'] as bool?) ?? true,
+      paymentRoundNotificationsEnabled: (m['paymentRoundNotificationsEnabled'] as bool?) ?? true,
+      boeteNotificationsEnabled: (m['boeteNotificationsEnabled'] as bool?) ?? true,
       locale: m['locale'] as String?,
       currencyCode: m['currencyCode'] as String? ?? 'EUR',
     );
@@ -81,6 +87,8 @@ class UserPreferences {
 
   Map<String, dynamic> toMap() => {
         'notificationsEnabled': notificationsEnabled,
+        'paymentRoundNotificationsEnabled': paymentRoundNotificationsEnabled,
+        'boeteNotificationsEnabled': boeteNotificationsEnabled,
         if (locale != null) 'locale': locale,
         if (currencyCode != null) 'currencyCode': currencyCode,
       };

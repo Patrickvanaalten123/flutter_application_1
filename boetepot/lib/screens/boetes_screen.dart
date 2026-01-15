@@ -425,7 +425,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Edit Boete',
+                            'Boete wijzigen',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -436,13 +436,13 @@ class _BoetesScreenState extends State<BoetesScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+                    TextField(controller: title, decoration: const InputDecoration(labelText: 'Titel')),
                     const SizedBox(height: 10),
-                    TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+                    TextField(controller: desc, decoration: const InputDecoration(labelText: 'Omschrijving')),
                     const SizedBox(height: 10),
                     TextField(
                       controller: amount,
-                      decoration: const InputDecoration(labelText: 'Amount (€)'),
+                      decoration: const InputDecoration(labelText: 'Bedrag (€)'),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                     if (error != null)
@@ -457,7 +457,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                         final d = desc.text.trim();
                         final a = double.tryParse(amount.text.replaceAll(',', '.'));
                         if (t.isEmpty || d.isEmpty || a == null) {
-                          setState(() => error = 'Please fill all fields with a valid amount.');
+                          setState(() => error = 'Vul alle velden in met een geldig bedrag.');
                           return;
                         }
                         await _boeteService.updateBoete(
@@ -470,7 +470,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                         if (!mounted) return;
                         Navigator.pop(context);
                       },
-                      child: const Text('Save'),
+                      child: const Text('Opslaan'),
                     ),
                   ],
                 );
@@ -486,11 +486,11 @@ class _BoetesScreenState extends State<BoetesScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Boete'),
+        title: const Text('Boete verwijderen'),
         content: const Text('Weet je zeker dat je deze boete wil verwijderen?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwijderen')),
         ],
       ),
     );
@@ -538,7 +538,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                     const SizedBox(height: 10),
                     TextField(
                       controller: emails,
-                      decoration: const InputDecoration(labelText: 'Lid e-mails (comma separated)'),
+                      decoration: const InputDecoration(labelText: 'Lid e-mails (komma-gescheiden)'),
                       keyboardType: TextInputType.emailAddress,
                     ),
                     if (error != null)
@@ -550,7 +550,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                         const SizedBox(width: 6),
                         FilledButton(
                           onPressed: () async {
@@ -565,19 +565,26 @@ class _BoetesScreenState extends State<BoetesScreen> {
                                 .where((e) => e.isNotEmpty)
                                 .toList();
                             try {
-                              final newId = await _groupService.createGroup(
+                              final res = await _groupService.createGroup(
                                 name: n,
                                 currentUid: widget.currentUid,
                                 memberEmails: emailList,
                               );
-                              widget.onGroupCreated?.call(newId, n);
                               if (!mounted) return;
                               Navigator.pop(context);
+                              widget.onGroupCreated?.call(res.groupId, n);
+                              if (res.blockedEmails.isNotEmpty && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Niet toegevoegd (geen account): ${res.blockedEmails.join(', ')}'),
+                                  ),
+                                );
+                              }
                             } catch (e) {
                               setState(() => error = e.toString());
                             }
                           },
-                          child: const Text('Create'),
+                          child: const Text('Aanmaken'),
                         ),
                       ],
                     ),
@@ -813,7 +820,7 @@ class _SwipeRevealState extends State<_SwipeReveal> with SingleTickerProviderSta
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _SwipeActionButton(
-                              label: 'Edit',
+                              label: 'Wijzig',
                               icon: Icons.edit,
                               background: AppTheme.cardFill,
                               foreground: AppTheme.textPrimary,
@@ -824,7 +831,7 @@ class _SwipeRevealState extends State<_SwipeReveal> with SingleTickerProviderSta
                             ),
                             const SizedBox(width: _gap),
                             _SwipeActionButton(
-                              label: 'Delete',
+                              label: 'Verwijder',
                               icon: Icons.delete,
                               background: Colors.red.withAlpha((0.22 * 255).round()),
                               foreground: Colors.redAccent,

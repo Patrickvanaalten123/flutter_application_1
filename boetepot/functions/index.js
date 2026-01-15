@@ -9,6 +9,7 @@ admin.initializeApp();
 setGlobalOptions({maxInstances: 10, region: "europe-west2"});
 
 const PAYMENT_ROUND_PATH = "paymentRounds/{roundId}";
+const BOETE_PATH = "boetes/{boeteId}";
 
 /**
  * @param {Date} date
@@ -96,4 +97,72 @@ async function handlePaymentRoundCreated(event) {
 exports.onPaymentRoundCreated = onDocumentCreated(
     PAYMENT_ROUND_PATH,
     handlePaymentRoundCreated,
+);
+
+/**
+ * Sends an FCM notification to the assignee when a new boete is created.
+ *
+ * Clients subscribe to the topic: `boetepot_user_{uid}`.
+ */
+/**
+ * @param {object} event CloudEvent from Firestore trigger.
+ * @return {Promise<void>}
+ */
+async function handleBoeteCreated(event) {
+  const snap = event.data;
+  if (!snap) return;
+
+  const data = snap.data() || {};
+  const groupId = data.groupId;
+  const assignedToUid = data.assignedToUid;
+  if (!assignedToUid) {
+    return;
+  }
+
+  let groupName = "BoetePot";
+  if (groupId) {
+    try {
+      const groupSnap = await admin
+          .firestore()
+          .collection("groups")
+          .doc(String(groupId))
+          .get();
+      const g = groupSnap.data() || {};
+      if (typeof g.name === "string" && g.name.trim()) {
+        groupName = g.name.trim();
+      }
+    } catch (e) {
+      logger.warn(
+          "Failed to load group name for boete notification",
+          {groupId: String(groupId), err: String(e)},
+      );
+    }
+  }
+
+  const title = "Je hebt een boete gekregen";
+  const body = `Je hebt een boete gekregen vanuit deze boetepot app. ` +
+      `(${groupName})`;
+  const topic = `boetepot_user_${assignedToUid}`;
+
+  await admin.messaging().send({
+    topic: topic,
+    notification: {title: title, body: body},
+    data: {
+      type: "boeteAssigned",
+      groupId: groupId ? String(groupId) : "",
+      boeteId: String(snap.id),
+      assignedToUid: String(assignedToUid),
+    },
+  });
+
+  logger.info("Sent boete notification", {
+    boeteId: snap.id,
+    groupId: groupId ? String(groupId) : "",
+    assignedToUid: String(assignedToUid),
+  });
+}
+
+exports.onBoeteCreated = onDocumentCreated(
+    BOETE_PATH,
+    handleBoeteCreated,
 );

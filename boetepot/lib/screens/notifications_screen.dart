@@ -19,7 +19,10 @@ class NotificationsScreen extends StatelessWidget {
         stream: UserService.watchMe(user.uid),
         builder: (context, snap) {
           final me = snap.data;
-          final enabled = me?.preferences.notificationsEnabled ?? true;
+          final prefs = me?.preferences ?? const UserPreferences();
+          final enabled = prefs.notificationsEnabled;
+          final paymentRoundsEnabled = prefs.paymentRoundNotificationsEnabled;
+          final boetesEnabled = prefs.boeteNotificationsEnabled;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -30,31 +33,59 @@ class NotificationsScreen extends StatelessWidget {
                   children: [
                     Text('Pushmeldingen', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 8),
-                    Text(
-                      'Ontvang een melding als een betaalronde start.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 10),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: enabled,
                       onChanged: (v) async {
                         await UserService.setNotifications(user.uid, v);
-                        if (!v) {
-                          await NotificationsService.unsubscribeCurrentTopic();
-                          return;
-                        }
                         final gid = groupId;
-                        if (gid == null) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Selecteer eerst een BoetePot om meldingen te activeren.')),
-                          );
-                          return;
-                        }
-                        await NotificationsService.syncForGroup(uid: user.uid, groupId: gid);
+                        await NotificationsService.sync(uid: user.uid, groupId: gid);
                       },
                       title: const Text('Ingeschakeld'),
+                    ),
+                    const Divider(height: 1, color: AppTheme.cardStroke),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: paymentRoundsEnabled,
+                      onChanged: !enabled
+                          ? null
+                          : (v) async {
+                              await UserService.setPaymentRoundNotifications(user.uid, v);
+                              final gid = groupId;
+                              await NotificationsService.sync(uid: user.uid, groupId: gid);
+                              if (!v && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Meldingen voor betaalrondes uitgeschakeld.')),
+                                );
+                              }
+                            },
+                      title: const Text('Betaalronde gestart'),
+                      subtitle: Text(
+                        groupId == null ? 'Selecteer eerst een BoetePot.' : 'Ontvang een melding als een betaalronde start.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                      ),
+                    ),
+                    const Divider(height: 1, color: AppTheme.cardStroke),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: boetesEnabled,
+                      onChanged: !enabled
+                          ? null
+                          : (v) async {
+                              await UserService.setBoeteNotifications(user.uid, v);
+                              final gid = groupId;
+                              await NotificationsService.sync(uid: user.uid, groupId: gid);
+                              if (!v && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Meldingen voor boetes uitgeschakeld.')),
+                                );
+                              }
+                            },
+                      title: const Text('Boete gekregen'),
+                      subtitle: Text(
+                        'Ontvang een melding als je een boete krijgt.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                      ),
                     ),
                   ],
                 ),
@@ -66,4 +97,3 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 }
-

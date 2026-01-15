@@ -9,15 +9,18 @@ class UserService {
     if (user == null) return;
     final ref = _db.collection('users').doc(user.uid);
     final snap = await ref.get();
+    final email = (user.email ?? '').toLowerCase();
     if (!snap.exists) {
       await ref.set({
-        'email': user.email ?? '',
+        'email': email,
         if (displayName != null && displayName.isNotEmpty) 'displayName': displayName,
         'isAdmin': false,
         'preferences': const UserPreferences().toMap(),
       }, SetOptions(merge: true));
     } else if (displayName != null && displayName.isNotEmpty) {
-      await ref.set({'displayName': displayName}, SetOptions(merge: true));
+      await ref.set({'displayName': displayName, 'email': email}, SetOptions(merge: true));
+    } else if (email.isNotEmpty && (snap.data()?['email'] as String?) != email) {
+      await ref.set({'email': email}, SetOptions(merge: true));
     }
   }
 
@@ -43,6 +46,18 @@ class UserService {
   static Future<void> setNotifications(String uid, bool enabled) {
     return _db.collection('users').doc(uid).set({
       'preferences.notificationsEnabled': enabled,
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> setPaymentRoundNotifications(String uid, bool enabled) {
+    return _db.collection('users').doc(uid).set({
+      'preferences.paymentRoundNotificationsEnabled': enabled,
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> setBoeteNotifications(String uid, bool enabled) {
+    return _db.collection('users').doc(uid).set({
+      'preferences.boeteNotificationsEnabled': enabled,
     }, SetOptions(merge: true));
   }
 

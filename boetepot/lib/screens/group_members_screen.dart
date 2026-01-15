@@ -18,6 +18,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   final _newMembersText = TextEditingController();
   String? _error;
   bool _busy = false;
+  String? _notice;
 
   @override
   void initState() {
@@ -34,7 +35,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Members – ${widget.groupName}'),
+        title: Text('Leden – ${widget.groupName}'),
       ),
       body: ListView(
         children: [
@@ -45,7 +46,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 TextField(
                   controller: _newMembersText,
                   decoration: const InputDecoration(
-                    labelText: 'Emails (comma-separated)',
+                    labelText: 'E-mails (komma-gescheiden)',
+                    helperText: 'Alleen bestaande accounts kunnen toegevoegd worden.',
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -66,10 +68,19 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                           setState(() {
                             _busy = true;
                             _error = null;
+                            _notice = null;
                           });
-                          await _svc.addMembers(widget.groupId, emails);
+                          final requested = emails.toSet().toList();
+                          final blocked = await _svc.addMembers(widget.groupId, requested);
+                          final addedCount = (requested.length - blocked.length).clamp(0, 9999);
                           setState(() {
-                            _newMembersText.clear();
+                            if (blocked.isEmpty) {
+                              _newMembersText.clear();
+                              _notice = 'Toegevoegd: $addedCount';
+                            } else {
+                              _newMembersText.text = blocked.join(', ');
+                              _notice = 'Toegevoegd: $addedCount • Niet gevonden: ${blocked.join(', ')}';
+                            }
                             _error = null;
                             _busy = false;
                           });
@@ -80,9 +91,13 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                           });
                         }
                       },
-                      child: Text(_busy ? 'Adding…' : 'Add'),
+                      child: Text(_busy ? 'Toevoegen…' : 'Toevoegen'),
                     )
                   ],
+                ),
+                if (_notice != null) Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_notice!, style: const TextStyle(color: Colors.orange)),
                 ),
                 if (_error != null) Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -94,9 +109,14 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           const Divider(),
           ..._members.map((u) {
             final role = _roles[u.id] ?? 'member';
+            final roleLabel = role == 'admin'
+                ? 'admin'
+                : role == 'boeteAssigner'
+                    ? 'boete-uitdeler'
+                    : 'lid';
             return ListTile(
               title: Text(u.displayName?.isNotEmpty == true ? u.displayName! : u.email),
-              subtitle: Text('${u.email} • $role'),
+              subtitle: Text('${u.email} • $roleLabel'),
               trailing: PopupMenuButton<String>(
                 onSelected: (v) async {
                   try {
@@ -112,10 +132,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   }
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'admin', child: Text('Make Admin')),
-                  PopupMenuItem(value: 'boeteAssigner', child: Text('Make BoeteAssigner')),
-                  PopupMenuItem(value: 'member', child: Text('Make Member')),
-                  PopupMenuItem(value: 'remove', child: Text('Remove')),
+                  PopupMenuItem(value: 'admin', child: Text('Maak admin')),
+                  PopupMenuItem(value: 'boeteAssigner', child: Text('Maak boete-uitdeler')),
+                  PopupMenuItem(value: 'member', child: Text('Maak lid')),
+                  PopupMenuItem(value: 'remove', child: Text('Verwijderen')),
                 ],
               ),
             );

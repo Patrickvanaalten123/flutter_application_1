@@ -11,13 +11,15 @@ class AuthService {
   static Stream<User?> authState() => _auth.authStateChanges();
 
   static Future<void> signIn(String email, String password) async {
-    final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
+    final normalizedEmail = email.trim().toLowerCase();
+    final cred = await _auth.signInWithEmailAndPassword(email: normalizedEmail, password: password);
     await UserService.ensureUserDoc(cred.user);
     await _ensureAdminField(cred.user);
   }
 
   static Future<void> register(String email, String password, {String? displayName}) async {
-    final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    final normalizedEmail = email.trim().toLowerCase();
+    final cred = await _auth.createUserWithEmailAndPassword(email: normalizedEmail, password: password);
     if (displayName != null && displayName.isNotEmpty) {
       await cred.user?.updateDisplayName(displayName);
     }

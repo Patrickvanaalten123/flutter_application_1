@@ -4,6 +4,22 @@ import '../models.dart';
 class GroupService {
   final _db = FirebaseFirestore.instance;
 
+  Future<Map<String, String>> _lookupUidsByEmail(Set<String> emails) async {
+    if (emails.isEmpty) return {};
+    final Map<String, String> uidByEmail = {};
+    final list = emails.toList();
+    for (var i = 0; i < list.length; i += 10) {
+      final chunk = list.sublist(i, i + 10 > list.length ? list.length : i + 10);
+      final snap = await _db.collection('users').where('email', whereIn: chunk).get();
+      for (final doc in snap.docs) {
+        final email = (doc.data()['email'] as String?)?.trim().toLowerCase();
+        if (email == null || email.isEmpty) continue;
+        uidByEmail[email] = doc.id;
+      }
+    }
+    return uidByEmail;
+  }
+
   /// Robust group listing: read from `userGroups/{uid}/groups/*` to avoid
   /// Firestore rules/queries issues with membership-based `list`.
   Stream<List<GroupLink>> watchGroupsFor(String uid) {
@@ -59,23 +75,16 @@ class GroupService {
     }
   }
 
-  Future<String> createGroup({
+  Future<({String groupId, List<String> blockedEmails})> createGroup({
     required String name,
     required String currentUid,
     List<String> memberEmails = const [],
   }) async {
-    final trimmedEmails = memberEmails
-        .map((e) => e.trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final normalizedEmails = memberEmails.map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty).toSet();
+    final uidByEmail = await _lookupUidsByEmail(normalizedEmails);
+    final missing = normalizedEmails.where((e) => !uidByEmail.containsKey(e)).toList()..sort();
 
-    // lookup users by email (chunked)
-    final Set<String> memberUids = {currentUid};
-    for (var i = 0; i < trimmedEmails.length; i += 10) {
-      final chunk = trimmedEmails.sublist(i, i + 10 > trimmedEmails.length ? trimmedEmails.length : i + 10);
-      final snap = await _db.collection('users').where('email', whereIn: chunk).get();
-      memberUids.addAll(snap.docs.map((d) => d.id));
-    }
+    final memberUids = <String>{currentUid, ...uidByEmail.values};
 
     final roles = <String, String>{currentUid: 'admin'};
     for (final uid in memberUids) {
@@ -106,7 +115,7 @@ class GroupService {
     }
 
     await batch.commit();
-    return ref.id;
+    return (groupId: ref.id, blockedEmails: missing);
   }
 
   // Members + roles for a single group with roles normalized to UID keys
@@ -159,20 +168,13 @@ class GroupService {
     });
   }
 
-  Future<void> addMembers(String groupId, List<String> emails) async {
-    final trimmed = emails.map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty).toSet().toList();
-    if (trimmed.isEmpty) return;
-    final chunks = <List<String>>[];
-    for (var i = 0; i < trimmed.length; i += 10) {
-      chunks.add(trimmed.sublist(i, i + 10 > trimmed.length ? trimmed.length : i + 10));
-    }
-    final List<String> uids = [];
-    for (final chunk in chunks) {
-      final snap = await _db.collection('users').where('email', whereIn: chunk).get();
-      uids.addAll(snap.docs.map((d) => d.id));
-    }
-    if (uids.isEmpty) return;
-
+  Future<List<String>> addMembers(String groupId, List<String> emails) async {
+    final normalizedEmails = emails.map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty).toSet();
+    if (normalizedEmails.isEmpty) return const [];
+    final uidByEmail = await _lookupUidsByEmail(normalizedEmails);
+    final missing = normalizedEmails.where((e) => !uidByEmail.containsKey(e)).toList()..sort();
+    final uids = uidByEmail.values.toSet().toList();
+    if (uids.isEmpty) return missing;
     final updates = <String, dynamic>{};
     for (final uid in uids) {
       updates['roles.$uid'] = 'member';
@@ -182,8 +184,8 @@ class GroupService {
     // Fetch group name for link docs (best-effort).
     final groupSnap = await ref.get();
     final gName = (groupSnap.data()?['name'] as String?) ?? 'BoetePot';
-    final currentMembers = (groupSnap.data()?['members'] as List?)?.length ?? 0;
-    final newMemberCount = currentMembers + uids.length;
+    final currentMembers = (groupSnap.data()?['members'] as List?)?.map((e) => e.toString()).toSet() ?? <String>{};
+    final newMemberCount = <String>{...currentMembers, ...uids}.length;
 
     final batch = _db.batch();
     batch.update(ref, {
@@ -203,6 +205,7 @@ class GroupService {
     }
 
     await batch.commit();
+    return missing;
   }
 
   Future<void> removeMember(String groupId, String uid) async {

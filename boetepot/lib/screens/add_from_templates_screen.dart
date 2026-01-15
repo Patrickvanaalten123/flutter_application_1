@@ -38,14 +38,14 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
   Widget build(BuildContext context) {
     final meEmail = FirebaseAuth.instance.currentUser?.email ?? '';
     return Scaffold(
-      appBar: AppBar(title: const Text('Add from templates')),
+      appBar: AppBar(title: const Text('Toevoegen uit sjablonen')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const Text('Assign to:'),
+                const Text('Toewijzen aan:'),
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButton<String>(
@@ -64,23 +64,23 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
           Expanded(
             child: StreamBuilder<List<BoeteTemplate>>(
               stream: _templatesStream,
-              builder: (context, snap) {
-                if (snap.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'Kon templates niet laden:\n${snap.error}',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final items = snap.data!;
-                _latestTemplates = items;
-                if (items.isEmpty) return const Center(child: Text('No templates'));
-                return ListView.separated(
+                  builder: (context, snap) {
+                    if (snap.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Kon sjablonen niet laden:\n${snap.error}',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    }
+                    if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                    final items = snap.data!;
+                    _latestTemplates = items;
+                    if (items.isEmpty) return const Center(child: Text('Geen sjablonen'));
+                    return ListView.separated(
                   itemCount: items.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) {
@@ -122,15 +122,15 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
             padding: const EdgeInsets.all(12.0),
             child: FilledButton.icon(
               icon: const Icon(Icons.add),
-              label: const Text('Add selected'),
+              label: const Text('Geselecteerde toevoegen'),
               onPressed: () async {
                 final meEmailNow = meEmail;
                 if (_selectedUid == null) {
-                  setState(() => _error = 'Select a member');
+                  setState(() => _error = 'Selecteer een lid');
                   return;
                 }
                 if (_selectedTemplateIds.isEmpty) {
-                  setState(() => _error = 'Selecteer minimaal één template');
+                  setState(() => _error = 'Selecteer minimaal één sjabloon');
                   return;
                 }
                 final assignee = widget.members.firstWhere((u) => u.id == _selectedUid, orElse: () => AppUser(id: _selectedUid!, email: _selectedUid!));
@@ -138,7 +138,7 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
                   final templates = _latestTemplates.isNotEmpty ? _latestTemplates : await _service.fetchTemplatesOnce(widget.groupId);
                   final chosen = templates.where((t) => _selectedTemplateIds.contains(t.id)).toList();
                   if (chosen.isEmpty) {
-                    setState(() => _error = 'Geen templates geselecteerd');
+                    setState(() => _error = 'Geen sjablonen geselecteerd');
                     return;
                   }
                   await _service.addBoetesFromTemplates(

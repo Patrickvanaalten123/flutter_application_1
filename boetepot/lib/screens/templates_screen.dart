@@ -36,11 +36,11 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     final meEmail = FirebaseAuth.instance.currentUser?.email ?? '';
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Templates'),
+        title: const Text('Sjablonen'),
         actions: [
           IconButton(
             icon: const Icon(Icons.playlist_add),
-            tooltip: 'Add from templates',
+            tooltip: 'Toevoegen uit sjablonen',
             onPressed: () {
               Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => AddFromTemplatesScreen(groupId: widget.groupId, members: widget.currentMembers),
@@ -62,7 +62,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Kon templates niet laden',
+                        'Kon sjablonen niet laden',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
@@ -79,7 +79,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final all = snap.data!;
           final items = widget.isAdmin ? all : all.where((t) => t.isActive).toList();
-          if (items.isEmpty) return const Center(child: Text('No templates yet.'));
+          if (items.isEmpty) return const Center(child: Text('Nog geen sjablonen.'));
 
           final active = widget.isAdmin ? items.where((t) => t.isActive).toList() : items;
           final inactive = widget.isAdmin ? items.where((t) => !t.isActive).toList() : const <BoeteTemplate>[];
@@ -107,7 +107,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       floatingActionButton: widget.isAdmin
           ? FloatingActionButton.extended(
               onPressed: () => _showCreateDialog(context, meEmail),
-              label: const Text('New Template'),
+              label: const Text('Nieuw sjabloon'),
               icon: const Icon(Icons.add),
             )
           : null,
@@ -124,15 +124,15 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Create template'),
+          title: const Text('Sjabloon aanmaken'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
-              TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: title, decoration: const InputDecoration(labelText: 'Titel')),
+              TextField(controller: desc, decoration: const InputDecoration(labelText: 'Omschrijving')),
               TextField(
                 controller: amount,
-                decoration: const InputDecoration(labelText: 'Amount (€)'),
+                decoration: const InputDecoration(labelText: 'Bedrag (€)'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               if (error != null) Padding(
@@ -142,14 +142,14 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
             FilledButton(
               onPressed: () async {
                 final t = title.text.trim();
                 final d = desc.text.trim();
                 final a = double.tryParse(amount.text.replaceAll(',', '.'));
                 if (t.isEmpty || d.isEmpty || a == null) {
-                  setState(() => error = 'Please fill all fields with a valid amount.');
+                  setState(() => error = 'Vul alle velden in met een geldig bedrag.');
                   return;
                 }
                 await _service.createTemplate(
@@ -161,7 +161,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                 );
                 if (context.mounted) Navigator.pop(context);
               },
-              child: const Text('Save'),
+              child: const Text('Opslaan'),
             ),
           ],
         ),
@@ -219,15 +219,15 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Template wijzigen'),
+          title: const Text('Sjabloon wijzigen'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
-              TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: title, decoration: const InputDecoration(labelText: 'Titel')),
+              TextField(controller: desc, decoration: const InputDecoration(labelText: 'Omschrijving')),
               TextField(
                 controller: amount,
-                decoration: const InputDecoration(labelText: 'Amount (€)'),
+                decoration: const InputDecoration(labelText: 'Bedrag (€)'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               if (error != null)
@@ -238,7 +238,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
             FilledButton(
               onPressed: () async {
                 final t = title.text.trim();
