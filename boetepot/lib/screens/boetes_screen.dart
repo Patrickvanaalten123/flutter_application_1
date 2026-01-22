@@ -40,6 +40,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
 
   Map<String, double> _paidTotals = {};
   bool _loadingTotals = false;
+  bool _totalsDetailsExpanded = false;
 
   @override
   void didUpdateWidget(covariant BoetesScreen oldWidget) {
@@ -256,6 +257,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
   Widget _totalsCard(List<Boete> items) {
     final paid = _paidTotals.values.fold(0.0, (s, v) => s + v);
     final open = _outstanding(items);
+    final expanded = _totalsDetailsExpanded;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AppCard(
@@ -296,17 +298,50 @@ class _BoetesScreenState extends State<BoetesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text('Details', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontWeight: FontWeight.w700)),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
-                          ],
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => setState(() => _totalsDetailsExpanded = !_totalsDetailsExpanded),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Details',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: AppTheme.textSecondary, fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                    size: 18,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        _detailRow('Totaal', _formatCurrency(_totalAmount(items))),
-                        _detailRow('Betaald', _formatCurrency(paid)),
-                        _detailRow('Open', _formatCurrency(open), bold: true),
+                        AnimatedCrossFade(
+                          duration: const Duration(milliseconds: 180),
+                          firstCurve: Curves.easeOutCubic,
+                          secondCurve: Curves.easeOutCubic,
+                          sizeCurve: Curves.easeOutCubic,
+                          crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                          firstChild: const SizedBox.shrink(),
+                          secondChild: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 6),
+                              _detailRow('Totaal', _formatCurrency(_totalAmount(items))),
+                              _detailRow('Betaald', _formatCurrency(paid)),
+                              _detailRow('Open', _formatCurrency(open), bold: true),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

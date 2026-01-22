@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models.dart';
 
 class GroupService {
   final _db = FirebaseFirestore.instance;
+  final _functions = FirebaseFunctions.instanceFor(region: 'europe-west2');
 
   Future<Map<String, String>> _lookupUidsByEmail(Set<String> emails) async {
     if (emails.isEmpty) return {};
@@ -218,6 +220,16 @@ class GroupService {
     final linkRef = _db.collection('userGroups').doc(uid).collection('groups').doc(groupId);
     batch.delete(linkRef);
     await batch.commit();
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    final callable = _functions.httpsCallable('deleteBoetepot');
+    try {
+      await callable.call({'groupId': groupId});
+    } on FirebaseFunctionsException catch (e) {
+      final msg = (e.message ?? '').trim();
+      throw Exception(msg.isNotEmpty ? msg : 'Kan BoetePot niet verwijderen (${e.code}).');
+    }
   }
 
   Future<void> setRole(String groupId, String uid, String role) async {

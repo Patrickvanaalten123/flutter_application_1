@@ -2,6 +2,22 @@
 
 A new Flutter project.
 
+## App icon (iOS + Android)
+
+De app-icoon die je op je telefoon ziet (en die meegaat in je iOS Archive / Android AAB) komt uit:
+- iOS: `boetepot/ios/Runner/Assets.xcassets/AppIcon.appiconset`
+- Android: `boetepot/android/app/src/main/res/mipmap-*` (en eventueel adaptive icon in `mipmap-anydpi-v26`)
+
+In dit project is `flutter_launcher_icons` toegevoegd zodat je met 1 commando beide platformen kunt genereren.
+
+1) Zet je 1024×1024 PNG op: `boetepot/assets/images/app_icon.png`
+2) Run:
+   - `cd boetepot`
+   - `flutter pub get`
+   - `dart run flutter_launcher_icons`
+
+Daarna opnieuw build/archiven voor App Store Connect / Play Console.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

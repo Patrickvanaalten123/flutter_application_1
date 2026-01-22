@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const {setGlobalOptions} = require("firebase-functions");
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
 admin.initializeApp();
@@ -10,6 +11,151 @@ setGlobalOptions({maxInstances: 10, region: "europe-west2"});
 
 const PAYMENT_ROUND_PATH = "paymentRounds/{roundId}";
 const BOETE_PATH = "boetes/{boeteId}";
+
+/**
+ * Deletes documents for the given query in batches.
+ * @param {FirebaseFirestore.Query<FirebaseFirestore.DocumentData>} query
+ * @param {number} batchSize
+ * @return {Promise<void>}
+ */
+async function deleteQueryInBatches(query, batchSize = 450) {
+  let done = false;
+  while (!done) {
+    const snap = await query.limit(batchSize).get();
+    if (snap.empty) {
+      done = true;
+      continue;
+    }
+    const batch = admin.firestore().batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+/**
+ * Deletes all `payments` subcollection documents for a list of payment rounds.
+ * @param {Array<FirebaseFirestore.QueryDocumentSnapshot>} roundDocs
+ * @return {Promise<void>}
+ */
+async function deletePaymentsSubcollections(roundDocs) {
+  for (const doc of roundDocs) {
+    await deleteQueryInBatches(doc.ref.collection("payments"));
+  }
+}
+
+/**
+ * Deletes a BoetePot and its related data.
+ * Only the group creator or an admin may delete.
+ */
+exports.deleteBoetepot = onCall({timeoutSeconds: 540}, async (request) => {
+  try {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Je bent niet ingelogd.");
+    }
+    const groupId = String((request.data && request.data.groupId) || "").trim();
+    if (!groupId) {
+      throw new HttpsError("invalid-argument", "groupId is verplicht.");
+    }
+
+    const db = admin.firestore();
+    const groupRef = db.collection("groups").doc(groupId);
+    const groupSnap = await groupRef.get();
+    if (!groupSnap.exists) {
+      throw new HttpsError("not-found", "BoetePot bestaat niet (meer).");
+    }
+
+    const g = groupSnap.data() || {};
+    const createdBy = String(g.createdBy || "");
+    const members = Array.isArray(g.members) ? g.members.map(String) : [];
+    const roles = g.roles || {};
+    const email = request.auth.token && request.auth.token.email ?
+      String(request.auth.token.email) :
+      "";
+    const role = String(roles[request.auth.uid] || roles[email] || "member");
+
+    if (request.auth.uid !== createdBy && role !== "admin") {
+      throw new HttpsError(
+          "permission-denied",
+          "Je hebt geen rechten om deze BoetePot te verwijderen.",
+      );
+    }
+
+    logger.info("Deleting BoetePot", {
+      groupId: groupId,
+      requestedBy: request.auth.uid,
+    });
+
+    logger.info("Delete boetes start", {groupId: groupId});
+    await deleteQueryInBatches(
+        db.collection("boetes").where("groupId", "==", groupId),
+    );
+    logger.info("Delete boetes done", {groupId: groupId});
+
+    logger.info("Delete templates start", {groupId: groupId});
+    await deleteQueryInBatches(
+        db.collection("boeteTemplates").where("groupId", "==", groupId),
+    );
+    logger.info("Delete templates done", {groupId: groupId});
+
+    const roundsQuery = db
+        .collection("paymentRounds")
+        .where("groupId", "==", groupId);
+    const roundsSnap = await roundsQuery.get();
+    logger.info("Delete payment rounds start", {
+      groupId: groupId,
+      rounds: roundsSnap.size,
+    });
+    await deletePaymentsSubcollections(roundsSnap.docs);
+    await deleteQueryInBatches(roundsQuery);
+    logger.info("Delete payment rounds done", {
+      groupId: groupId,
+      rounds: roundsSnap.size,
+    });
+
+    // Remove user->group link docs for all known members (safe & fast).
+    let deletedLinks = 0;
+    if (members.length > 0) {
+      logger.info("Delete user group links start", {
+        groupId: groupId,
+        members: members.length,
+      });
+      const batchSize = 450;
+      for (let i = 0; i < members.length; i += batchSize) {
+        const batch = db.batch();
+        const chunk = members.slice(i, i + batchSize);
+        chunk.forEach((uid) => {
+          const linkRef = db
+              .collection("userGroups")
+              .doc(String(uid))
+              .collection("groups")
+              .doc(groupId);
+          batch.delete(linkRef);
+        });
+        await batch.commit();
+        deletedLinks += chunk.length;
+      }
+      logger.info("Delete user group links done", {
+        groupId: groupId,
+        deletedLinks: deletedLinks,
+      });
+    }
+
+    logger.info("Delete group doc start", {groupId: groupId});
+    await groupRef.delete();
+    logger.info("Delete group doc done", {groupId: groupId});
+
+    logger.info("Deleted BoetePot", {groupId: groupId});
+    return {
+      ok: true,
+      deletedLinks: deletedLinks,
+      deletedRounds: roundsSnap.size,
+    };
+  } catch (err) {
+    logger.error("deleteBoetepot failed", {err: String(err)});
+    if (err instanceof HttpsError) throw err;
+    throw new HttpsError("internal", "Verwijderen mislukt. Probeer opnieuw.");
+  }
+});
 
 /**
  * @param {Date} date

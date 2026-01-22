@@ -221,6 +221,7 @@ class PaymentRound {
   final String createdBy;
   final String status; // "open" | "closed"
   final String? note;
+  final String? paymentLink;
   final Timestamp asOf;
 
   PaymentRound({
@@ -231,6 +232,7 @@ class PaymentRound {
     required this.status,
     required this.asOf,
     this.note,
+    this.paymentLink,
   });
 
   factory PaymentRound.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -242,6 +244,7 @@ class PaymentRound {
       createdBy: (d['createdBy'] as String?) ?? '',
       status: (d['status'] as String?) ?? 'open',
       note: d['note'] as String?,
+      paymentLink: d['paymentLink'] as String?,
       asOf: (d['asOf'] as Timestamp?) ?? Timestamp.now(),
     );
   }
@@ -249,6 +252,7 @@ class PaymentRound {
   PaymentRound copyWith({
     String? status,
     String? note,
+    String? paymentLink,
   }) {
     return PaymentRound(
       id: id,
@@ -257,6 +261,7 @@ class PaymentRound {
       createdBy: createdBy,
       status: status ?? this.status,
       note: note ?? this.note,
+      paymentLink: paymentLink ?? this.paymentLink,
       asOf: asOf,
     );
   }

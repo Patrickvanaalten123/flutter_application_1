@@ -5,6 +5,25 @@ import '../models.dart';
 class TemplatesService {
   final _db = FirebaseFirestore.instance;
 
+  Future<void> _assertCanIssueBoete({
+    required String groupId,
+    required String actorUid,
+  }) async {
+    if (actorUid.isEmpty) {
+      throw Exception('Je bent niet ingelogd.');
+    }
+    final snap = await _db.collection('groups').doc(groupId).get();
+    final data = snap.data() ?? <String, dynamic>{};
+    final roles = (data['roles'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? <String, String>{};
+    final members = (data['members'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    final role = roles[actorUid] ?? 'member';
+
+    final allowed = role == 'admin' || role == 'boeteAssigner';
+    if (!members.contains(actorUid) || !allowed) {
+      throw Exception('Je hebt geen rechten om boetes uit te delen in deze BoetePot.');
+    }
+  }
+
   Stream<List<BoeteTemplate>> watchTemplates(String groupId) {
     final controller = StreamController<List<BoeteTemplate>>();
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sub;
@@ -176,8 +195,10 @@ class TemplatesService {
     String? assignedToEmail,
     required String groupId,
     required String createdByEmail,
+    required String createdByUid,
   }) async {
     if (templates.isEmpty) return;
+    await _assertCanIssueBoete(groupId: groupId, actorUid: createdByUid);
     final batch = _db.batch();
     for (final tpl in templates) {
       final ref = _db.collection('boetes').doc();

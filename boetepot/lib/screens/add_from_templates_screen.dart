@@ -37,6 +37,7 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
   @override
   Widget build(BuildContext context) {
     final meEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+    final meUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return Scaffold(
       appBar: AppBar(title: const Text('Toevoegen uit sjablonen')),
       body: Column(
@@ -147,6 +148,7 @@ class _AddFromTemplatesScreenState extends State<AddFromTemplatesScreen> {
                     assignedToEmail: assignee.email,
                     groupId: widget.groupId,
                     createdByEmail: meEmailNow,
+                    createdByUid: meUid,
                   );
                   if (mounted) Navigator.pop(context);
                 } catch (e) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/payment_round_service.dart';
 import '../models.dart';
 import '../ui.dart';
@@ -27,6 +28,17 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
   PaymentRound? _selectedRound;
   bool _loading = false;
   String? _error;
+
+  Uri? _tryParseHttpUrl(String input) {
+    final raw = input.trim();
+    if (raw.isEmpty) return null;
+    final normalized = raw.startsWith('http://') || raw.startsWith('https://') ? raw : 'https://$raw';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    if (uri.host.isEmpty) return null;
+    return uri;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,6 +341,7 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
     DateTime asOf = DateTime.now();
     bool includeZero = false;
     final note = TextEditingController();
+    final paymentLink = TextEditingController();
     String? error;
 
     await showModalBottomSheet(
@@ -393,6 +406,13 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                       controller: note,
                       decoration: const InputDecoration(labelText: 'Notitie (optioneel)'),
                     ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: paymentLink,
+                      decoration: const InputDecoration(labelText: 'Betaallink (optioneel)'),
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.done,
+                    ),
                     if (error != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -410,10 +430,17 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                               setState(() => error = null);
                               setState(() => _loading = true);
                               final me = FirebaseAuth.instance.currentUser!;
+                              final link = paymentLink.text.trim();
+                              final uri = link.isEmpty ? null : _tryParseHttpUrl(link);
+                              if (link.isNotEmpty && uri == null) {
+                                setState(() => error = 'Vul een geldige link in (https://...)');
+                                return;
+                              }
                               final round = await _service.createRound(
                                 groupId: widget.groupId,
                                 asOf: asOf,
                                 note: note.text.trim().isEmpty ? null : note.text.trim(),
+                                paymentLink: uri?.toString(),
                                 includeZeroMembers: includeZero,
                                 currentUid: me.uid,
                               );
@@ -567,6 +594,7 @@ class _PaymentsList extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = PaymentRoundService();
     final isOpen = round.status == 'open';
+    final link = round.paymentLink;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: Column(
@@ -589,6 +617,39 @@ class _PaymentsList extends StatelessWidget {
             ],
           ),
           Text('T/m ${_fmtDate(round.asOf.toDate())}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
+          if (link != null && link.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () async {
+                final raw = link.trim();
+                final normalized = raw.startsWith('http://') || raw.startsWith('https://') ? raw : 'https://$raw';
+                final uri = Uri.tryParse(normalized);
+                if (uri == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ongeldige link.')));
+                  return;
+                }
+                final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!ok && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kan link niet openen.')));
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.link, size: 16, color: AppTheme.gold),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Betaallink openen',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Expanded(
             child: StreamBuilder<List<PaymentObligation>>(

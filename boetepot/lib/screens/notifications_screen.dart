@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models.dart';
 import '../services/notifications_service.dart';
 import '../services/user_service.dart';
 import '../ui.dart';
@@ -37,9 +38,16 @@ class NotificationsScreen extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       value: enabled,
                       onChanged: (v) async {
-                        await UserService.setNotifications(user.uid, v);
-                        final gid = groupId;
-                        await NotificationsService.sync(uid: user.uid, groupId: gid);
+                        try {
+                          await UserService.setNotifications(user.uid, v);
+                          final gid = groupId;
+                          await NotificationsService.sync(uid: user.uid, groupId: gid);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
                       },
                       title: const Text('Ingeschakeld'),
                     ),
@@ -50,12 +58,19 @@ class NotificationsScreen extends StatelessWidget {
                       onChanged: !enabled
                           ? null
                           : (v) async {
-                              await UserService.setPaymentRoundNotifications(user.uid, v);
-                              final gid = groupId;
-                              await NotificationsService.sync(uid: user.uid, groupId: gid);
-                              if (!v && context.mounted) {
+                              try {
+                                await UserService.setPaymentRoundNotifications(user.uid, v);
+                                final gid = groupId;
+                                await NotificationsService.sync(uid: user.uid, groupId: gid);
+                                if (!v && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Meldingen voor betaalrondes uitgeschakeld.')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Meldingen voor betaalrondes uitgeschakeld.')),
+                                  SnackBar(content: Text(e.toString())),
                                 );
                               }
                             },
@@ -72,12 +87,19 @@ class NotificationsScreen extends StatelessWidget {
                       onChanged: !enabled
                           ? null
                           : (v) async {
-                              await UserService.setBoeteNotifications(user.uid, v);
-                              final gid = groupId;
-                              await NotificationsService.sync(uid: user.uid, groupId: gid);
-                              if (!v && context.mounted) {
+                              try {
+                                await UserService.setBoeteNotifications(user.uid, v);
+                                final gid = groupId;
+                                await NotificationsService.sync(uid: user.uid, groupId: gid);
+                                if (!v && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Meldingen voor boetes uitgeschakeld.')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Meldingen voor boetes uitgeschakeld.')),
+                                  SnackBar(content: Text(e.toString())),
                                 );
                               }
                             },

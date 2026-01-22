@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +34,20 @@ class _HomeShellState extends State<HomeShell> {
   List<AppUser> _currentMembers = [];
   final _boeteService = BoeteService();
   final GlobalKey _fabKey = GlobalKey();
+
+  void _clearSelectedGroup({required String uid}) {
+    setState(() {
+      _selectedGroupId = null;
+      _selectedGroupName = null;
+      _currentMembers = [];
+      _currentRoles = {};
+    });
+    unawaited(
+      NotificationsService.sync(uid: uid, groupId: null).catchError((_) {
+        // Best-effort.
+      }),
+    );
+  }
 
   void _selectGroup({
     required String uid,
@@ -256,17 +271,22 @@ class _HomeShellState extends State<HomeShell> {
                           final assigneeEmail = _currentMembers
                               .firstWhere((u) => u.id == selectedUid, orElse: () => AppUser(id: selectedUid, email: ''))
                               .email;
-                          await _boeteService.addBoete(
-                            title: t,
-                            description: d,
-                            amount: a,
-                            userEmail: FirebaseAuth.instance.currentUser?.email ?? '',
-                            groupId: _selectedGroupId!,
-                            assignedToUid: selectedUid,
-                            assignedToEmail: assigneeEmail,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(context);
+                          try {
+                            await _boeteService.addBoete(
+                              title: t,
+                              description: d,
+                              amount: a,
+                              userEmail: FirebaseAuth.instance.currentUser?.email ?? '',
+                              groupId: _selectedGroupId!,
+                              assignedToUid: selectedUid,
+                              createdByUid: FirebaseAuth.instance.currentUser?.uid ?? '',
+                              assignedToEmail: assigneeEmail,
+                            );
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                          } catch (e) {
+                            setState(() => error = e.toString());
+                          }
                         },
                         child: const Text('Toevoegen'),
                       ),
@@ -416,15 +436,20 @@ class _HomeShellState extends State<HomeShell> {
                           final assigneeEmail = _currentMembers
                               .firstWhere((u) => u.id == assignee, orElse: () => AppUser(id: assignee, email: ''))
                               .email;
-                          await _boeteService.addBoetesFromTemplates(
-                            templates: chosen,
-                            assignedToUid: assignee,
-                            assignedToEmail: assigneeEmail,
-                            groupId: _selectedGroupId!,
-                            createdByEmail: FirebaseAuth.instance.currentUser?.email ?? '',
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(context);
+                          try {
+                            await _boeteService.addBoetesFromTemplates(
+                              templates: chosen,
+                              assignedToUid: assignee,
+                              assignedToEmail: assigneeEmail,
+                              groupId: _selectedGroupId!,
+                              createdByEmail: FirebaseAuth.instance.currentUser?.email ?? '',
+                              createdByUid: FirebaseAuth.instance.currentUser?.uid ?? '',
+                            );
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                          } catch (e) {
+                            setState(() => error = e.toString());
+                          }
                         },
                         child: const Text('Toevoegen'),
                       ),
@@ -439,7 +464,7 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  Future<void> _showQuickActionsMenu({required bool isAdmin}) async {
+  Future<void> _showQuickActionsMenu({required bool isAdmin, required bool canIssueBoetes}) async {
     final renderObject = _fabKey.currentContext?.findRenderObject();
     if (renderObject is! RenderBox) return;
     final overlay = Overlay.of(context).context.findRenderObject();
@@ -449,32 +474,33 @@ class _HomeShellState extends State<HomeShell> {
     final bottomRight = renderObject.localToGlobal(renderObject.size.bottomRight(Offset.zero), ancestor: overlay);
     final position = RelativeRect.fromRect(Rect.fromPoints(topLeft, bottomRight), Offset.zero & overlay.size);
 
-    final selected = await showMenu<String>(
-      context: context,
-      position: position,
-      items: [
-        const PopupMenuItem(value: 'createPot', child: Text('Nieuwe BoetePot')),
+    final items = <PopupMenuEntry<String>>[
+      if (canIssueBoetes)
         PopupMenuItem(
           value: 'addBoete',
           enabled: _selectedGroupId != null,
           child: const Text('Boete toevoegen'),
         ),
+      if (canIssueBoetes)
         PopupMenuItem(
           value: 'addFromTemplates',
           enabled: _selectedGroupId != null,
           child: const Text('Toevoegen uit sjablonen'),
         ),
-        if (isAdmin && _selectedGroupId != null)
-          const PopupMenuItem(value: 'manageTemplates', child: Text('Sjablonen beheren')),
-      ],
+      if (isAdmin && _selectedGroupId != null)
+        const PopupMenuItem(value: 'manageTemplates', child: Text('Sjablonen beheren')),
+    ];
+    if (items.isEmpty) return;
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: position,
+      items: items,
     );
 
     if (!mounted || selected == null) return;
 
     switch (selected) {
-      case 'createPot':
-        await _showCreatePotSheet();
-        break;
       case 'addBoete':
         await _showAddBoeteDialog();
         break;
@@ -498,7 +524,9 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
-    final isAdmin = _currentRoles[user.uid] == 'admin';
+    final role = _currentRoles[user.uid] ?? 'member';
+    final isAdmin = role == 'admin';
+    final canIssueBoetes = role == 'admin' || role == 'boeteAssigner';
 
     return AppShell(
       topPadding: 10,
@@ -534,6 +562,10 @@ class _HomeShellState extends State<HomeShell> {
                             builder: (_) => GroupMembersScreen(
                                   groupId: _selectedGroupId!,
                                   groupName: _selectedGroupName ?? '',
+                                  onDeleted: () {
+                                    final uid = FirebaseAuth.instance.currentUser?.uid;
+                                    if (uid != null) _clearSelectedGroup(uid: uid);
+                                  },
                                 ),
                           ))
                       : null,
@@ -567,7 +599,7 @@ class _HomeShellState extends State<HomeShell> {
                   key: _fabKey,
                   child: GoldFab(
                     icon: Icons.add,
-                    onPressed: () => _showQuickActionsMenu(isAdmin: isAdmin),
+                    onPressed: () => _showQuickActionsMenu(isAdmin: isAdmin, canIssueBoetes: canIssueBoetes),
                   ),
                 ),
               ),
@@ -662,22 +694,53 @@ class _BottomTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.cardFill,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.cardStroke, width: 1),
-        ),
-        child: Row(
-          children: [
-            _tab(context, 0, Icons.list, 'Boetes'),
-            _tab(context, 1, Icons.euro, 'Betalingen'),
-            _tab(context, 2, Icons.bar_chart, 'Statistiek'),
-            _tab(context, 3, Icons.person, 'Profiel'),
-          ],
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppTheme.cardFill,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppTheme.cardStroke, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha((0.35 * 255).round()),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: SizedBox(
+              height: 64,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: index == 0 ? 2 : 1,
+                      child: _tab(context, 0, Icons.receipt_long_rounded, 'Boetes'),
+                    ),
+                    Expanded(
+                      flex: index == 1 ? 2 : 1,
+                      child: _tab(context, 1, Icons.payments_rounded, 'Betalingen'),
+                    ),
+                    Expanded(
+                      flex: index == 2 ? 2 : 1,
+                      child: _tab(context, 2, Icons.query_stats_rounded, 'Statistiek'),
+                    ),
+                    Expanded(
+                      flex: index == 3 ? 2 : 1,
+                      child: _tab(context, 3, Icons.person_rounded, 'Profiel'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -686,25 +749,60 @@ class _BottomTabBar extends StatelessWidget {
   Widget _tab(BuildContext context, int idx, IconData icon, String label) {
     final selected = idx == index;
     final color = selected ? AppTheme.gold : AppTheme.textSecondary;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => onSelect(idx),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
+    final bg = selected ? AppTheme.gold.withAlpha((0.12 * 255).round()) : Colors.transparent;
+    final stroke = selected ? AppTheme.gold.withAlpha((0.35 * 255).round()) : Colors.transparent;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => onSelect(idx),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.symmetric(horizontal: selected ? 8 : 0, vertical: 10),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: stroke, width: 1),
               ),
-            ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: color, size: 22),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.centerLeft,
+                      child: selected
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 70),
+                                child: Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                        color: color,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                              ),
+                            )
+                          : const SizedBox(width: 0, height: 0),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -67,6 +67,7 @@ class PaymentRoundService {
     required String groupId,
     required DateTime asOf,
     String? note,
+    String? paymentLink,
     required bool includeZeroMembers,
     required String currentUid,
   }) async {
@@ -134,6 +135,7 @@ class PaymentRoundService {
       'createdBy': currentUid,
       'status': 'open',
       'note': (note != null && note.isNotEmpty) ? note : null,
+      'paymentLink': (paymentLink != null && paymentLink.isNotEmpty) ? paymentLink : null,
       'asOf': asOfTs,
     });
 

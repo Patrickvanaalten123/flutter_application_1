@@ -5,7 +5,13 @@ import '../models.dart';
 class GroupMembersScreen extends StatefulWidget {
   final String groupId;
   final String groupName;
-  const GroupMembersScreen({super.key, required this.groupId, required this.groupName});
+  final VoidCallback? onDeleted;
+  const GroupMembersScreen({
+    super.key,
+    required this.groupId,
+    required this.groupName,
+    this.onDeleted,
+  });
 
   @override
   State<GroupMembersScreen> createState() => _GroupMembersScreenState();
@@ -19,6 +25,49 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   String? _error;
   bool _busy = false;
   String? _notice;
+
+  Future<void> _confirmDeleteGroup() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('BoetePot verwijderen'),
+        content: Text(
+          'Weet je zeker dat je "${widget.groupName}" wilt verwijderen?\n\n'
+          'Dit verwijdert ook boetes, sjablonen en betaalrondes van deze BoetePot.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuleren')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Verwijderen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      setState(() {
+        _busy = true;
+        _error = null;
+        _notice = null;
+      });
+      await _svc.deleteGroup(widget.groupId);
+      if (!mounted) return;
+      widget.onDeleted?.call();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BoetePot verwijderd.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -140,6 +189,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               ),
             );
           }),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _confirmDeleteGroup,
+              icon: const Icon(Icons.delete_forever),
+              label: const Text('BoetePot verwijderen'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            ),
+          ),
         ],
       ),
     );

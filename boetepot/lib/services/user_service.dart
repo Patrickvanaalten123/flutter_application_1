@@ -45,19 +45,25 @@ class UserService {
 
   static Future<void> setNotifications(String uid, bool enabled) {
     return _db.collection('users').doc(uid).set({
-      'preferences.notificationsEnabled': enabled,
+      'preferences': {
+        'notificationsEnabled': enabled,
+      },
     }, SetOptions(merge: true));
   }
 
   static Future<void> setPaymentRoundNotifications(String uid, bool enabled) {
     return _db.collection('users').doc(uid).set({
-      'preferences.paymentRoundNotificationsEnabled': enabled,
+      'preferences': {
+        'paymentRoundNotificationsEnabled': enabled,
+      },
     }, SetOptions(merge: true));
   }
 
   static Future<void> setBoeteNotifications(String uid, bool enabled) {
     return _db.collection('users').doc(uid).set({
-      'preferences.boeteNotificationsEnabled': enabled,
+      'preferences': {
+        'boeteNotificationsEnabled': enabled,
+      },
     }, SetOptions(merge: true));
   }
 
