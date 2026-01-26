@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'user_service.dart';
 import 'notifications_service.dart';
@@ -7,6 +8,7 @@ import 'notifications_service.dart';
 class AuthService {
   static final _auth = FirebaseAuth.instance;
   static final _db = FirebaseFirestore.instance;
+  static final _functions = FirebaseFunctions.instanceFor(region: 'europe-west2');
 
   static Stream<User?> authState() => _auth.authStateChanges();
 
@@ -69,6 +71,43 @@ class AuthService {
     final cred = EmailAuthProvider.credential(email: user.email!, password: currentPassword);
     await user.reauthenticateWithCredential(cred);
     await user.updatePassword(newPassword);
+  }
+
+  static Future<void> sendPasswordResetEmail(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      throw Exception('E-mail is verplicht.');
+    }
+    await _auth.sendPasswordResetEmail(email: normalizedEmail);
+  }
+
+  static Future<void> deleteAccount({
+    required String currentPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('Je bent niet ingelogd.');
+    }
+    if (currentPassword.trim().isEmpty) {
+      throw Exception('Vul je huidige wachtwoord in ter verificatie.');
+    }
+
+    final cred = EmailAuthProvider.credential(email: user.email!, password: currentPassword);
+    await user.reauthenticateWithCredential(cred);
+
+    // Best-effort: stop push subscriptions before deleting the account.
+    await NotificationsService.cleanupOnSignOut();
+
+    final callable = _functions.httpsCallable('deleteMyAccount');
+    try {
+      await callable.call();
+    } on FirebaseFunctionsException catch (e) {
+      final msg = (e.message ?? '').trim();
+      throw Exception(msg.isNotEmpty ? msg : 'Account verwijderen mislukt (${e.code}).');
+    } finally {
+      // Ensure local session is cleared even if function fails midway.
+      await _auth.signOut();
+    }
   }
 
   static Future<void> _ensureAdminField(User? user) async {

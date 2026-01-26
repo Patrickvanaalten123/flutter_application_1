@@ -312,3 +312,271 @@ exports.onBoeteCreated = onDocumentCreated(
     BOETE_PATH,
     handleBoeteCreated,
 );
+
+/**
+ * Deletes the currently authenticated user's account and personal data.
+ *
+ * - Removes the user from all groups.
+ * - Deletes `users/{uid}` and `userGroups/{uid}/groups/*`.
+ * - Deletes profile photo `userphotos/{uid}.jpg` (best-effort).
+ * - Removes the user's payment obligation docs from
+ *   `paymentRounds/{roundId}/payments/{uid}` (best-effort).
+ * - Anonymizes email fields in historical docs (best-effort).
+ * - Deletes the Firebase Auth user.
+ */
+exports.deleteMyAccount = onCall({timeoutSeconds: 540}, async (request) => {
+  try {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Je bent niet ingelogd.");
+    }
+
+    const uid = String(request.auth.uid);
+    const db = admin.firestore();
+
+    const userRef = db.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.data() || {};
+    const email = typeof userData.email === "string" ?
+      userData.email.trim().toLowerCase() :
+      "";
+
+    // Discover groups via userGroups links (fast) with a membership fallback.
+    const groupIds = new Set();
+    try {
+      const linksSnap = await db
+          .collection("userGroups")
+          .doc(uid)
+          .collection("groups")
+          .get();
+      linksSnap.docs.forEach((d) => {
+        if (d.id !== "_meta") groupIds.add(d.id);
+      });
+    } catch (e) {
+      logger.warn(
+          "Failed to read userGroups links during account deletion",
+          {uid: uid, err: String(e)},
+      );
+    }
+
+    try {
+      const groupsSnap = await db
+          .collection("groups")
+          .where("members", "array-contains", uid)
+          .get();
+      groupsSnap.docs.forEach((d) => groupIds.add(d.id));
+    } catch (e) {
+      logger.warn(
+          "Failed to query groups membership during account deletion",
+          {uid: uid, err: String(e)},
+      );
+    }
+
+    logger.info("Deleting account", {uid: uid, groups: groupIds.size});
+
+    // Remove the user from groups; ensure at least one admin remains.
+    for (const groupId of groupIds) {
+      const groupRef = db.collection("groups").doc(String(groupId));
+      const groupSnap = await groupRef.get();
+      if (!groupSnap.exists) continue;
+      const g = groupSnap.data() || {};
+
+      const members = Array.isArray(g.members) ? g.members.map(String) : [];
+      const rolesRaw = g.roles && typeof g.roles === "object" ? g.roles : {};
+      const roles = {...rolesRaw};
+
+      const newMembers = members.filter((m) => m !== uid);
+      if (roles[uid] !== undefined) delete roles[uid];
+
+      // If the group becomes empty, clean it up entirely (user-owned data).
+      if (newMembers.length === 0) {
+        logger.info("Deleting empty group during account deletion", {
+          uid: uid,
+          groupId: String(groupId),
+        });
+
+        await deleteQueryInBatches(
+            db.collection("boetes").where("groupId", "==", String(groupId)),
+        );
+        await deleteQueryInBatches(
+            db
+                .collection("boeteTemplates")
+                .where("groupId", "==", String(groupId)),
+        );
+
+        const roundsQuery = db
+            .collection("paymentRounds")
+            .where("groupId", "==", String(groupId));
+        const roundsSnap = await roundsQuery.get();
+        await deletePaymentsSubcollections(roundsSnap.docs);
+        await deleteQueryInBatches(roundsQuery);
+
+        await groupRef.delete();
+        continue;
+      }
+
+      let createdBy = typeof g.createdBy === "string" ? g.createdBy : "";
+      let creatorChanged = false;
+
+      // If the user was the creator, reassign to an admin or first member.
+      if (createdBy === uid) {
+        const adminUid = newMembers.find(
+            (m) => String(roles[m] || "") === "admin",
+        );
+        createdBy = adminUid || (newMembers[0] || "");
+        creatorChanged = true;
+      }
+
+      // Ensure at least one admin remains if the group still has members.
+      const hasAdmin = newMembers.some(
+          (m) => String(roles[m] || "") === "admin",
+      );
+      if (newMembers.length > 0 && !hasAdmin) {
+        roles[newMembers[0]] = "admin";
+        if (!createdBy) {
+          createdBy = newMembers[0];
+          creatorChanged = true;
+        }
+      }
+
+      const batch = db.batch();
+      batch.update(groupRef, {
+        members: newMembers,
+        roles: roles,
+        ...(creatorChanged ? {createdBy: createdBy} : {}),
+      });
+
+      // Update memberCount in link docs for remaining members (best-effort).
+      const memberCount = newMembers.length;
+      for (const memberUid of newMembers) {
+        const linkRef = db
+            .collection("userGroups")
+            .doc(String(memberUid))
+            .collection("groups")
+            .doc(String(groupId));
+        batch.set(linkRef, {memberCount: memberCount}, {merge: true});
+      }
+
+      // Remove the link doc for the deleting user.
+      const myLinkRef = db
+          .collection("userGroups")
+          .doc(uid)
+          .collection("groups")
+          .doc(String(groupId));
+      batch.delete(myLinkRef);
+
+      await batch.commit();
+    }
+
+    // Remove payment obligation docs for this uid (best-effort).
+    const groupIdList = Array.from(groupIds);
+    for (let i = 0; i < groupIdList.length; i += 10) {
+      const chunk = groupIdList.slice(i, i + 10);
+      const roundsSnap = await db
+          .collection("paymentRounds")
+          .where("groupId", "in", chunk)
+          .get();
+      for (const roundDoc of roundsSnap.docs) {
+        await roundDoc.ref
+            .collection("payments")
+            .doc(uid)
+            .delete()
+            .catch(() => null);
+      }
+    }
+
+    // Best-effort anonymization of historical docs that store raw emails.
+    const anon = "verwijderde-gebruiker";
+    if (email) {
+      let done = false;
+      while (!done) {
+        const snap = await db
+            .collection("boetes")
+            .where("userEmail", "==", email)
+            .limit(400)
+            .get();
+        if (snap.empty) {
+          done = true;
+          continue;
+        }
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.update(d.ref, {userEmail: anon}));
+        await batch.commit();
+      }
+
+      done = false;
+      while (!done) {
+        const snap = await db
+            .collection("boeteTemplates")
+            .where("createdBy", "==", email)
+            .limit(400)
+            .get();
+        if (snap.empty) {
+          done = true;
+          continue;
+        }
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.update(d.ref, {createdBy: anon}));
+        await batch.commit();
+      }
+    }
+
+    // Remove assignedToEmail for boetes that were assigned to this uid.
+    let assignedDone = false;
+    while (!assignedDone) {
+      const snap = await db
+          .collection("boetes")
+          .where("assignedToUid", "==", uid)
+          .limit(400)
+          .get();
+      if (snap.empty) {
+        assignedDone = true;
+        continue;
+      }
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.update(d.ref, {
+        assignedToEmail: admin.firestore.FieldValue.delete(),
+      }));
+      await batch.commit();
+    }
+
+    // Delete userGroups subcollection docs (if any remain).
+    try {
+      await deleteQueryInBatches(
+          db.collection("userGroups").doc(uid).collection("groups"),
+      );
+    } catch (e) {
+      logger.warn(
+          "Failed to delete userGroups links subcollection",
+          {uid: uid, err: String(e)},
+      );
+    }
+    await db.collection("userGroups").doc(uid).delete().catch(() => null);
+
+    // Delete user doc.
+    await userRef.delete().catch(() => null);
+
+    // Delete profile photo from Storage (best-effort).
+    try {
+      const bucket = admin.storage().bucket();
+      await bucket.file(`userphotos/${uid}.jpg`).delete();
+    } catch (e) {
+      const msg = String(e);
+      if (!msg.includes("No such object") && !msg.includes("404")) {
+        logger.warn("Failed to delete profile photo", {uid: uid, err: msg});
+      }
+    }
+
+    // Delete the Firebase Auth user last.
+    await admin.auth().deleteUser(uid);
+
+    logger.info("Deleted account", {uid: uid});
+    return {ok: true};
+  } catch (err) {
+    logger.error("deleteMyAccount failed", {err: String(err)});
+    if (err instanceof HttpsError) throw err;
+    throw new HttpsError(
+        "internal",
+        "Account verwijderen mislukt. Probeer opnieuw.",
+    );
+  }
+});

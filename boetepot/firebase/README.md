@@ -44,3 +44,18 @@ If deploy fails with Eventarc/IAM errors, an Owner/IAM Admin may need to grant:
 Client setup notes:
 - Add the dependency: `firebase_messaging` (already added in `boetepot/pubspec.yaml`).
 - iOS: in Xcode, enable **Push Notifications** capability (Runner target).
+
+## Account verwijderen (Play Store policy)
+
+De app heeft een ingebouwde optie om je account te verwijderen (Profiel → Profiel & Instellingen → **Account permanent verwijderen**).
+
+Wat dit doet (server-side via Cloud Functions):
+- Verwijdert `users/{uid}` en `userGroups/{uid}/groups/*`
+- Verwijdert de gebruiker uit alle `groups/*` (en zorgt dat er minimaal 1 admin overblijft)
+- Verwijdert profielfoto `userphotos/{uid}.jpg` (best-effort)
+- Verwijdert payment-obligations `paymentRounds/{roundId}/payments/{uid}` (best-effort)
+- Anonimiseert historische e-mailvelden in `boetes`/`boeteTemplates` (best-effort)
+- Verwijdert de Firebase Auth user
+
+Deploy:
+- `firebase deploy --only functions:deleteMyAccount`

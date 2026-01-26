@@ -42,6 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newPassword = TextEditingController();
     final confirmNewPassword = TextEditingController();
 
+    final deletePassword = TextEditingController();
+
     String? error;
     String? success;
     bool saving = false;
@@ -214,6 +216,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   confirmNewPassword.clear();
                                 }),
                         child: const Text('Wachtwoord bijwerken'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Account verwijderen',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.redAccent),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Dit verwijdert je account definitief. Je wordt uit alle BoetePots verwijderd en je profielgegevens worden verwijderd.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: deletePassword,
+                    decoration: const InputDecoration(labelText: 'Huidig wachtwoord (verificatie)'),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: saving
+                            ? null
+                            : () => run(() async {
+                                  final pw = deletePassword.text;
+                                  if (pw.trim().isEmpty) {
+                                    throw Exception('Vul je huidige wachtwoord in ter verificatie.');
+                                  }
+
+                                  final nav = Navigator.of(sheetContext);
+                                  final confirmed = await showDialog<bool>(
+                                    context: sheetContext,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Account verwijderen?'),
+                                      content: const Text(
+                                        'Weet je zeker dat je je account definitief wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: const Text('Annuleren'),
+                                        ),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          child: const Text('Verwijder'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed != true) return;
+
+                                  await AuthService.deleteAccount(currentPassword: pw);
+                                  nav.pop();
+                                }),
+                        child: const Text('Account permanent verwijderen'),
                       ),
                     ],
                   ),
