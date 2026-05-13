@@ -95,6 +95,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+                  if (saving) ...[
+                    const SizedBox(height: 8),
+                    const LinearProgressIndicator(minHeight: 2),
+                    const SizedBox(height: 8),
+                  ],
                   const SizedBox(height: 10),
                   Text('Profiel', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
@@ -281,7 +286,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   await AuthService.deleteAccount(currentPassword: pw);
                                   nav.pop();
                                 }),
-                        child: const Text('Account permanent verwijderen'),
+                        child: saving
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text('Bezig met verwijderen…'),
+                                ],
+                              )
+                            : const Text('Account permanent verwijderen'),
                       ),
                     ],
                   ),
@@ -458,12 +476,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-                if (role != null) AppPill(text: role.toUpperCase(), color: role == 'admin' ? AppTheme.gold : null),
+                if (role != null) AppPill(text: role.toUpperCase()),
               ],
             ),
           if (hasGroup && widget.isAdminHere) ...[
             const SizedBox(height: 12),
-            const Divider(height: 1, color: AppTheme.cardStroke),
+            const Divider(height: 1, color: AppTheme.borderColor),
             const SizedBox(height: 6),
             _menuRow(
               context,
@@ -503,7 +521,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
-          const Divider(height: 1, color: AppTheme.cardStroke),
+          const Divider(height: 1, color: AppTheme.borderColor),
           _menuRow(
             context,
             icon: Icons.notifications,
@@ -516,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
-          const Divider(height: 1, color: AppTheme.cardStroke),
+          const Divider(height: 1, color: AppTheme.borderColor),
           _menuRow(
             context,
             icon: Icons.privacy_tip,
@@ -544,7 +562,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
             child: Image.asset('assets/images/RKHVV.png', width: 44, height: 44, fit: BoxFit.cover),
           ),
           const SizedBox(width: 12),
@@ -567,7 +585,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppTheme.radiusL),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(

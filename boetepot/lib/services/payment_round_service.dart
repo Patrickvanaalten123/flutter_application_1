@@ -1,8 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models.dart';
 
 class PaymentRoundService {
   final _db = FirebaseFirestore.instance;
+  final _functions = FirebaseFunctions.instanceFor(region: 'europe-west2');
+
+  static double computeServiceFee(double baseAmount) {
+    if (baseAmount <= 0) return 0;
+    final pct = baseAmount >= 100 ? 0.01 : 0.03;
+    final fee = baseAmount * pct;
+    final withMin = fee < 1 ? 1 : fee;
+    return double.parse(withMin.toStringAsFixed(2));
+  }
 
   Stream<List<PaymentRound>> watchRounds(String groupId) {
     return _db.collection('paymentRounds')
@@ -39,6 +49,28 @@ class PaymentRoundService {
     await _db.collection('paymentRounds').doc(roundId).set({
       'status': isOpen ? 'open' : 'closed',
     }, SetOptions(merge: true));
+  }
+
+  Future<Uri> createMollieCheckoutForRound({
+    required String roundId,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'createMolliePaymentForRound',
+      options: HttpsCallableOptions(timeout: const Duration(minutes: 2)),
+    );
+    try {
+      final res = await callable.call({'roundId': roundId});
+      final data = (res.data as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      final url = (data['checkoutUrl'] as String?)?.trim() ?? '';
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        throw Exception('Ongeldige betaal-URL ontvangen.');
+      }
+      return uri;
+    } on FirebaseFunctionsException catch (e) {
+      final msg = (e.message ?? '').trim();
+      throw Exception(msg.isNotEmpty ? msg : 'Betaling starten mislukt (${e.code}).');
+    }
   }
 
   // Compute totals already paid across all rounds for a group

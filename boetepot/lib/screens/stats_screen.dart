@@ -188,9 +188,15 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(labelFor(uid), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+                      child: Text(
+                        labelFor(uid),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
                     ),
-                    Text(valueFor(uid), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
+                    AmountPill(text: valueFor(uid)),
                   ],
                 ),
               );
@@ -226,7 +232,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     const SizedBox(width: 8),
                     Text(_label(boete.assignedToUid, memberByUid), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
                     const Spacer(),
-                    Text(_formatCurrency(boete.amount), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                    AmountPill(text: _formatCurrency(boete.amount), accent: true),
                   ],
                 ),
               ],
@@ -240,9 +246,9 @@ class _StatsScreenState extends State<StatsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.cardFill,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
+        color: AppTheme.surface2,
+        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+        border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,7 +258,7 @@ class _StatsScreenState extends State<StatsScreen> {
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: emphasize ? AppTheme.gold : AppTheme.textPrimary,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
           ),
         ],

@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/payment_round_service.dart';
+import '../services/group_service.dart';
 import '../models.dart';
 import '../ui.dart';
+
+bool _isProGroup(Map<String, dynamic> groupData) {
+  final billing = (groupData['billing'] as Map?)?.cast<String, dynamic>();
+  final plan = (billing?['plan'] as String?)?.toLowerCase();
+  if (plan == 'pro') return true;
+  return (groupData['isPro'] as bool?) ?? false;
+}
+
+bool _isMollieUiEnabled(Map<String, dynamic> groupData) {
+  final features = (groupData['features'] as Map?)?.cast<String, dynamic>();
+  return (features?['molliePaymentsEnabled'] as bool?) ?? false;
+}
 
 class BetalingenScreen extends StatefulWidget {
   final String groupId;
@@ -89,7 +103,7 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusL),
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -101,16 +115,19 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                                     ),
                                   );
                                 },
-                                child: AppCard(
-                                  radius: 22,
-                                  padding: const EdgeInsets.all(14),
+                                child: AppCard.dense(
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: AppTheme.cardFill,
-                                        child: const Icon(Icons.calendar_today, size: 16, color: AppTheme.gold),
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface2,
+                                          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                                          border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
+                                        ),
+                                        child: const Icon(Icons.calendar_today, size: 18, color: AppTheme.gold),
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
@@ -200,18 +217,21 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(18),
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusL),
                                     onTap: () => setState(() => _selectedRound = r),
-                                    child: AppCard(
-                                      radius: 22,
-                                      padding: const EdgeInsets.all(14),
+                                    child: AppCard.dense(
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          CircleAvatar(
-                                            radius: 16,
-                                            backgroundColor: AppTheme.cardFill,
-                                            child: const Icon(Icons.calendar_today, size: 16, color: AppTheme.gold),
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.surface2,
+                                              borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                                              border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
+                                            ),
+                                            child: const Icon(Icons.calendar_today, size: 18, color: AppTheme.gold),
                                           ),
                                           const SizedBox(width: 10),
                                           Expanded(
@@ -254,7 +274,7 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                               },
                             ),
                           ),
-                          Container(width: 1, color: AppTheme.cardStroke),
+                          Container(width: 1, color: AppTheme.borderColor),
                           Expanded(
                             flex: 3,
                             child: _selectedRound == null
@@ -343,6 +363,12 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
     final note = TextEditingController();
     final paymentLink = TextEditingController();
     String? error;
+    var isPro = false;
+    try {
+      final groupSnap = await FirebaseFirestore.instance.collection('groups').doc(widget.groupId).get();
+      isPro = _isProGroup(groupSnap.data() ?? const <String, dynamic>{});
+    } catch (_) {}
+    if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
@@ -352,7 +378,7 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
         return AppBottomSheet(
           childBuilder: (sheetContext, scrollController) {
             return StatefulBuilder(
-              builder: (context, setState) {
+              builder: (context, setSheetState) {
                 return ListView(
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -406,13 +432,31 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                       controller: note,
                       decoration: const InputDecoration(labelText: 'Notitie (optioneel)'),
                     ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: paymentLink,
-                      decoration: const InputDecoration(labelText: 'Betaallink (optioneel)'),
-                      keyboardType: TextInputType.url,
-                      textInputAction: TextInputAction.done,
-                    ),
+                    if (isPro) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: paymentLink,
+                        decoration: const InputDecoration(labelText: 'Betaallink (Pro, optioneel)'),
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.done,
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 10),
+                      AppCard.dense(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.lock, color: AppTheme.textSecondary, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Betaallink toevoegen is beschikbaar in Pro.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (error != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -425,35 +469,36 @@ class _BetalingenScreenState extends State<BetalingenScreen> {
                         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuleren')),
                         const SizedBox(width: 6),
                         FilledButton(
-                          onPressed: () async {
-                            try {
-                              setState(() => error = null);
-                              setState(() => _loading = true);
-                              final me = FirebaseAuth.instance.currentUser!;
-                              final link = paymentLink.text.trim();
+	                          onPressed: () async {
+	                            try {
+	                              setSheetState(() => error = null);
+	                              setState(() => _loading = true);
+	                              final me = FirebaseAuth.instance.currentUser!;
+	                              final link = isPro ? paymentLink.text.trim() : '';
                               final uri = link.isEmpty ? null : _tryParseHttpUrl(link);
                               if (link.isNotEmpty && uri == null) {
-                                setState(() => error = 'Vul een geldige link in (https://...)');
+                                setSheetState(() => error = 'Vul een geldige link in (https://...)');
                                 return;
                               }
                               final round = await _service.createRound(
                                 groupId: widget.groupId,
                                 asOf: asOf,
                                 note: note.text.trim().isEmpty ? null : note.text.trim(),
-                                paymentLink: uri?.toString(),
+                                paymentLink: isPro ? uri?.toString() : null,
                                 includeZeroMembers: includeZero,
                                 currentUid: me.uid,
                               );
-                              if (mounted) {
-                                Navigator.pop(context);
-                                setState(() => _selectedRound = round);
+	                              if (!context.mounted) return;
+	                              Navigator.pop(context);
+	                              if (mounted) setState(() => _selectedRound = round);
+	                            } catch (e) {
+                              if (context.mounted) {
+                                setSheetState(() => error = e.toString());
                               }
-                            } catch (e) {
-                              setState(() => error = e.toString());
-                            } finally {
-                              if (mounted) setState(() => _loading = false);
-                            }
-                          },
+	                            } finally {
+	                              if (mounted) setState(() => _loading = false);
+	                            }
+	                          },
                           child: const Text('Aanmaken'),
                         ),
                       ],
@@ -538,14 +583,14 @@ class _PaymentRoundDetailPageInnerState extends State<_PaymentRoundDetailPageInn
                   children: [
                     InkWell(
                       onTap: () => Navigator.pop(context),
-                      customBorder: const CircleBorder(),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusM),
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: AppTheme.cardFill,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppTheme.cardStroke, width: 1),
+                          color: AppTheme.surface2,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                          border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
                         ),
                         child: const Icon(Icons.chevron_left, color: AppTheme.textPrimary),
                       ),
@@ -595,11 +640,22 @@ class _PaymentsList extends StatelessWidget {
     final service = PaymentRoundService();
     final isOpen = round.status == 'open';
     final link = round.paymentLink;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final groups = FirebaseFirestore.instance.collection('groups');
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: groups.doc(round.groupId).snapshots(),
+      builder: (context, groupSnap) {
+        final g = groupSnap.data?.data() ?? const <String, dynamic>{};
+        final isPro = _isProGroup(g);
+        final mollieUiEnabled = _isMollieUiEnabled(g);
+        final mollie = (g['mollie'] as Map?)?.cast<String, dynamic>();
+        final mollieConnected = (mollie?['connected'] as bool?) ?? false;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Row(
             children: [
               Text(
@@ -617,10 +673,47 @@ class _PaymentsList extends StatelessWidget {
             ],
           ),
           Text('T/m ${_fmtDate(round.asOf.toDate())}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
-          if (link != null && link.trim().isNotEmpty) ...[
+          if (mollieUiEnabled && isAdminHere && !mollieConnected) ...[
+            const SizedBox(height: 10),
+            AppCard.dense(
+              child: Row(
+                children: [
+                  const Icon(Icons.link, color: AppTheme.gold, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Koppel Mollie om betalingen direct vanuit de app mogelijk te maken.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton(
+                    onPressed: () async {
+                      try {
+                        final uri = await GroupService().startMollieConnect(groupId: round.groupId);
+                        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        if (!ok && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Kan Mollie niet openen.')),
+                          );
+                        }
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    },
+                    child: const Text('Koppel Mollie'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isPro && link != null && link.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             InkWell(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppTheme.radiusS),
               onTap: () async {
                 final raw = link.trim();
                 final normalized = raw.startsWith('http://') || raw.startsWith('https://') ? raw : 'https://$raw';
@@ -664,7 +757,10 @@ class _PaymentsList extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final p = items[i];
-                    return AppCard(
+                    final isMe = p.uid == currentUid;
+                    final fee = PaymentRoundService.computeServiceFee(p.amount);
+                    final total = double.parse((p.amount + fee).toStringAsFixed(2));
+                    return AppCard.dense(
                       child: Row(
                         children: [
                           AvatarCircle(title: p.displayName ?? p.email ?? p.uid),
@@ -675,13 +771,11 @@ class _PaymentsList extends StatelessWidget {
                               children: [
                                 Text(
                                   p.displayName?.isNotEmpty == true ? p.displayName! : (p.email ?? p.uid),
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
                                 ),
-                                Text(
-                                  p.paid ? 'Betaald' : 'Open',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: p.paid ? Colors.greenAccent : AppTheme.textSecondary,
-                                      ),
+                                AppBadge(
+                                  text: p.paid ? 'BETAALD' : 'OPEN',
+                                  style: p.paid ? AppBadgeStyle.success : AppBadgeStyle.accent,
                                 ),
                               ],
                             ),
@@ -689,7 +783,77 @@ class _PaymentsList extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text('€${p.amount.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                              AmountPill(text: '€${p.amount.toStringAsFixed(2)}'),
+                              if (mollieUiEnabled && isMe && !p.paid && isOpen && mollieConnected) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Servicekosten €${fee.toStringAsFixed(2)}',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary, fontSize: 12),
+                                ),
+                                const SizedBox(height: 6),
+                                FilledButton(
+                                  onPressed: () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Betaling starten'),
+                                        content: Text(
+                                          'Je betaalt €${p.amount.toStringAsFixed(2)} + €${fee.toStringAsFixed(2)} servicekosten.\n'
+                                          'Totaal: €${total.toStringAsFixed(2)}.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: const Text('Annuleren'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            child: const Text('Betaal nu'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true) return;
+                                    if (!context.mounted) return;
+
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (_) => const AlertDialog(
+                                        content: Row(
+                                          children: [
+                                            SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(child: Text('Betaling voorbereiden…')),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+
+                                    try {
+                                      final checkout = await service.createMollieCheckoutForRound(roundId: round.id);
+                                      if (context.mounted) Navigator.of(context).pop(); // close progress
+                                      final ok = await launchUrl(checkout, mode: LaunchMode.externalApplication);
+                                      if (!ok && context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Kan Mollie betaling niet openen.')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) Navigator.of(context).pop(); // close progress
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(e.toString())),
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Betaal nu'),
+                                ),
+                              ],
                               if (p.paidAt != null)
                                 Text(
                                   'op ${_fmtDate(p.paidAt!.toDate())}',
@@ -714,8 +878,10 @@ class _PaymentsList extends StatelessWidget {
               },
             ),
           ),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 

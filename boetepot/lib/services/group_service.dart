@@ -232,6 +232,26 @@ class GroupService {
     }
   }
 
+  Future<Uri> startMollieConnect({required String groupId}) async {
+    final callable = _functions.httpsCallable(
+      'startMollieConnect',
+      options: HttpsCallableOptions(timeout: const Duration(minutes: 1)),
+    );
+    try {
+      final res = await callable.call({'groupId': groupId});
+      final data = (res.data as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      final url = (data['url'] as String?)?.trim() ?? '';
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        throw Exception('Ongeldige Mollie URL ontvangen.');
+      }
+      return uri;
+    } on FirebaseFunctionsException catch (e) {
+      final msg = (e.message ?? '').trim();
+      throw Exception(msg.isNotEmpty ? msg : 'Mollie koppelen mislukt (${e.code}).');
+    }
+  }
+
   Future<void> setRole(String groupId, String uid, String role) async {
     const allowed = {'admin', 'boeteAssigner', 'member'};
     if (!allowed.contains(role)) {

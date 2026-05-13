@@ -51,7 +51,7 @@ class NotificationsScreen extends StatelessWidget {
                       },
                       title: const Text('Ingeschakeld'),
                     ),
-                    const Divider(height: 1, color: AppTheme.cardStroke),
+                    const Divider(height: 1, color: AppTheme.borderColor),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: paymentRoundsEnabled,
@@ -80,7 +80,7 @@ class NotificationsScreen extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
                       ),
                     ),
-                    const Divider(height: 1, color: AppTheme.cardStroke),
+                    const Divider(height: 1, color: AppTheme.borderColor),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: boetesEnabled,

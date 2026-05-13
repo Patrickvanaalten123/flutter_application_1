@@ -3,17 +3,30 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 /// Palette and shared UI widgets to mirror the SwiftUI `AppUI` look.
 class AppTheme {
-  // Base colors
-  static const Color bgTop = Color.fromRGBO(23, 23, 28, 1); // 0.09,0.09,0.11
-  static const Color bgBottom = Color.fromRGBO(7, 7, 13, 1); // 0.03,0.03,0.05
+  // Design tokens
+  static const double radiusS = 10; // chips/badges
+  static const double radiusM = 14; // icon buttons / small buttons
+  static const double radiusL = 16; // cards / large containers
+
+  static const double borderWidth = 1;
+  static const Color borderColor = Color.fromRGBO(255, 255, 255, 0.12);
+
+  // Surfaces
+  static const Color surface = Color(0xFF151824);
+  static const Color surface2 = Color(0xFF1A1E2B);
+
+  // Accent
   static const Color gold = Color.fromRGBO(250, 189, 66, 1); // warm gold
 
-  // Card styling
-  static const Color cardFill = Color.fromRGBO(255, 255, 255, 0.06);
-  static const Color cardStroke = Color.fromRGBO(255, 255, 255, 0.10);
+  // Background (keep subtle gradient behind surfaces)
+  static const Color bgTop = Color(0xFF0F1118);
+  static const Color bgBottom = Color(0xFF07070D);
 
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color.fromRGBO(255, 255, 255, 0.65);
+  static const Color textTertiary = Color.fromRGBO(255, 255, 255, 0.45);
+  static const Color textOnAccent = Color(0xFF0E0F14);
+  static const Color textOnBadge = Color.fromRGBO(255, 255, 255, 0.75);
 
   static ThemeData themeData() {
     final base = ThemeData.dark(useMaterial3: true);
@@ -44,47 +57,59 @@ class AppTheme {
         foregroundColor: textPrimary,
       ),
       cardTheme: const CardThemeData(
-        color: cardFill,
+        color: surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: cardStroke, width: 1),
+          borderRadius: BorderRadius.all(Radius.circular(radiusL)),
+          side: BorderSide(color: borderColor, width: borderWidth),
         ),
       ),
       dialogTheme: const DialogThemeData(
-        backgroundColor: Color.fromRGBO(18, 18, 22, 1),
+        backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: gold,
-          foregroundColor: Colors.black,
+          foregroundColor: textOnAccent,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: base.textTheme.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusM)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: textPrimary,
-          side: const BorderSide(color: cardStroke, width: 1),
+          backgroundColor: surface2,
+          side: const BorderSide(color: borderColor, width: borderWidth),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: base.textTheme.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusM)),
         ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: gold,
+          textStyle: base.textTheme.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color.fromRGBO(255, 255, 255, 0.10),
+        thickness: 1,
+        space: 1,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: cardFill,
+        fillColor: surface2,
         hintStyle: base.textTheme.bodyMedium?.copyWith(color: textSecondary),
         labelStyle: base.textTheme.bodySmall?.copyWith(color: textSecondary, fontWeight: FontWeight.w600),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(radiusM), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: cardStroke, width: 1),
+          borderRadius: BorderRadius.circular(radiusM),
+          borderSide: const BorderSide(color: borderColor, width: borderWidth),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(radiusM),
           borderSide: const BorderSide(color: gold, width: 1.2),
         ),
       ),
@@ -132,35 +157,80 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.radius = 18,
+    this.padding = const EdgeInsets.all(16),
+    this.radius = AppTheme.radiusL,
   });
   final Widget child;
   final EdgeInsets padding;
   final double radius;
+
+  const AppCard.dense({
+    super.key,
+    required this.child,
+    this.radius = AppTheme.radiusL,
+  }) : padding = const EdgeInsets.all(12);
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: AppTheme.cardFill,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.35 * 255).round()),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: AppTheme.gold.withAlpha((0.08 * 255).round()),
-            blurRadius: 26,
-            offset: const Offset(0, 16),
-          ),
-        ],
+        border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
       child: child,
+    );
+  }
+}
+
+enum AppBadgeStyle { neutral, accent, success }
+
+class AppBadge extends StatelessWidget {
+  const AppBadge({
+    super.key,
+    required this.text,
+    this.style = AppBadgeStyle.neutral,
+  });
+
+  final String text;
+  final AppBadgeStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    late final Color fg;
+    late final Color bg;
+    late final Color border;
+
+    switch (style) {
+      case AppBadgeStyle.accent:
+        fg = AppTheme.gold;
+        bg = AppTheme.gold.withAlpha((0.14 * 255).round());
+        border = AppTheme.gold.withAlpha((0.35 * 255).round());
+        break;
+      case AppBadgeStyle.success:
+        fg = const Color(0xFF4ADE80);
+        bg = fg.withAlpha((0.14 * 255).round());
+        border = fg.withAlpha((0.35 * 255).round());
+        break;
+      case AppBadgeStyle.neutral:
+        fg = AppTheme.textOnBadge;
+        bg = AppTheme.surface2;
+        border = AppTheme.borderColor;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+        border: Border.all(color: border, width: AppTheme.borderWidth),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, color: fg),
+      ),
     );
   }
 }
@@ -172,22 +242,8 @@ class AppPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = color ?? AppTheme.textSecondary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppTheme.cardFill,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: fg,
-            ),
-      ),
-    );
+    final style = (color == AppTheme.gold) ? AppBadgeStyle.accent : AppBadgeStyle.neutral;
+    return AppBadge(text: text, style: style);
   }
 }
 
@@ -204,8 +260,8 @@ class AvatarCircle extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppTheme.cardFill,
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
+        color: AppTheme.surface2,
+        border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -255,8 +311,8 @@ class UserAvatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppTheme.cardFill,
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
+        color: AppTheme.surface2,
+        border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
       child: (url != null && url.isNotEmpty)
           ? Image(
@@ -278,36 +334,69 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = status.toLowerCase();
-    late final Color bg;
-    late final Color fg;
+    final badgeStyle = normalized == 'open' ? AppBadgeStyle.accent : AppBadgeStyle.neutral;
+    final label = switch (normalized) {
+      'open' => 'OPEN',
+      'closed' => 'GESLOTEN',
+      _ => normalized.toUpperCase(),
+    };
+    return AppBadge(text: label, style: badgeStyle);
+  }
+}
 
-    switch (normalized) {
-      case 'open':
-        bg = AppTheme.gold.withAlpha((0.16 * 255).round());
-        fg = AppTheme.gold;
-        break;
-      case 'closed':
-        bg = Colors.green.withAlpha((0.16 * 255).round());
-        fg = Colors.green.shade400;
-        break;
-      default:
-        bg = AppTheme.cardFill;
-        fg = AppTheme.textSecondary;
-    }
+class AmountPill extends StatelessWidget {
+  const AmountPill({
+    super.key,
+    required this.text,
+    this.accent = false,
+  });
 
+  final String text;
+  final bool accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = accent ? AppTheme.gold : AppTheme.textPrimary.withAlpha((0.92 * 255).round());
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.cardStroke, width: 1),
+        color: AppTheme.surface2,
+        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+        border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
       child: Text(
-        normalized.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: fg,
-            ),
+        text,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: fg),
+      ),
+    );
+  }
+}
+
+class AppIconButton extends StatelessWidget {
+  const AppIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      style: IconButton.styleFrom(
+        backgroundColor: AppTheme.surface2,
+        foregroundColor: AppTheme.textPrimary,
+        fixedSize: const Size(40, 40),
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusM)),
+        side: BorderSide(color: AppTheme.borderColor, width: AppTheme.borderWidth),
       ),
     );
   }
@@ -326,9 +415,9 @@ class GoldFab extends StatelessWidget {
       child: FloatingActionButton(
         onPressed: onPressed ?? () {},
         backgroundColor: AppTheme.gold,
-        foregroundColor: Colors.black,
+        foregroundColor: AppTheme.textOnAccent,
         shape: const CircleBorder(),
-        elevation: 8,
+        elevation: 2,
         child: Icon(icon, size: 22),
       ),
     );
@@ -399,9 +488,9 @@ class AppBottomSheet extends StatelessWidget {
           return SafeArea(
             top: false,
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppTheme.radiusL)),
               child: Material(
-                color: const Color(0xFF121216),
+                color: AppTheme.surface,
                 child: Column(
                   children: [
                     const SizedBox(height: 10),

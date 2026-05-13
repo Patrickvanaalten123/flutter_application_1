@@ -133,7 +133,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: AppCard(
-                radius: 22,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -261,7 +260,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AppCard(
-        radius: 22,
         padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,9 +289,9 @@ class _BoetesScreenState extends State<BoetesScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha((0.04 * 255).round()),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.cardStroke, width: 1),
+                      color: AppTheme.surface2,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                      border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,7 +299,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppTheme.radiusS),
                             onTap: () => setState(() => _totalsDetailsExpanded = !_totalsDetailsExpanded),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 2),
@@ -361,7 +359,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AppCard(
-        radius: 22,
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -398,7 +395,6 @@ class _BoetesScreenState extends State<BoetesScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
       child: AppCard(
-        radius: 22,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -422,10 +418,7 @@ class _BoetesScreenState extends State<BoetesScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Text(
-                      _formatCurrency(row.$2),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
-                    ),
+                    AmountPill(text: _formatCurrency(row.$2)),
                   ],
                 ),
               );
@@ -660,8 +653,7 @@ class _BoeteRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: SizedBox(
         width: double.infinity,
-        child: AppCard(
-          radius: 22,
+        child: AppCard.dense(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -701,17 +693,9 @@ class _BoeteRow extends StatelessWidget {
                 children: [
                   if (_assigneeLabel.isNotEmpty) AppPill(text: _assigneeLabel),
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.gold.withAlpha((0.14 * 255).round()),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppTheme.cardStroke, width: 1),
-                    ),
-                    child: Text(
-                      '€${boete.amount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
-                    ),
+                  AmountPill(
+                    text: '€${boete.amount.toStringAsFixed(2)}',
+                    accent: true,
                   ),
                 ],
               ),
@@ -756,14 +740,14 @@ class _SwipeActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppTheme.radiusM),
       child: Container(
         width: 88,
         height: 54,
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.cardStroke, width: 1),
+          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+          border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -772,7 +756,7 @@ class _SwipeActionButton extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: foreground, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -857,7 +841,7 @@ class _SwipeRevealState extends State<_SwipeReveal> with SingleTickerProviderSta
                             _SwipeActionButton(
                               label: 'Wijzig',
                               icon: Icons.edit,
-                              background: AppTheme.cardFill,
+                              background: AppTheme.surface2,
                               foreground: AppTheme.textPrimary,
                               onTap: () {
                                 widget.onEdit?.call();
@@ -914,7 +898,7 @@ class _AmountRing extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.cardStroke, width: 7),
+              border: Border.all(color: AppTheme.borderColor, width: 7),
             ),
           ),
           Transform.rotate(
@@ -923,7 +907,7 @@ class _AmountRing extends StatelessWidget {
               value: 0.82,
               strokeWidth: 8,
               color: AppTheme.gold,
-              backgroundColor: Colors.transparent,
+              backgroundColor: AppTheme.borderColor,
             ),
           ),
           Column(

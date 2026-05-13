@@ -98,16 +98,18 @@ class AuthService {
     // Best-effort: stop push subscriptions before deleting the account.
     await NotificationsService.cleanupOnSignOut();
 
-    final callable = _functions.httpsCallable('deleteMyAccount');
+    final callable = _functions.httpsCallable(
+      'deleteMyAccount',
+      options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+    );
     try {
       await callable.call();
     } on FirebaseFunctionsException catch (e) {
       final msg = (e.message ?? '').trim();
       throw Exception(msg.isNotEmpty ? msg : 'Account verwijderen mislukt (${e.code}).');
-    } finally {
-      // Ensure local session is cleared even if function fails midway.
-      await _auth.signOut();
     }
+
+    await _auth.signOut();
   }
 
   static Future<void> _ensureAdminField(User? user) async {

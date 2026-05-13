@@ -392,7 +392,7 @@ class _HomeShellState extends State<HomeShell> {
                             trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('€${tpl.amount.toStringAsFixed(2)}', style: const TextStyle(color: AppTheme.textPrimary)),
+                                AmountPill(text: '€${tpl.amount.toStringAsFixed(2)}'),
                                 const SizedBox(height: 4),
                                 Icon(checked ? Icons.check_circle : Icons.circle_outlined, color: checked ? AppTheme.gold : AppTheme.textSecondary),
                               ],
@@ -698,21 +698,14 @@ class _BottomTabBar extends StatelessWidget {
       top: false,
       minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppTheme.radiusL),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppTheme.cardFill,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppTheme.cardStroke, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha((0.35 * 255).round()),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(AppTheme.radiusL),
+              border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
             ),
             child: SizedBox(
               height: 64,
@@ -760,7 +753,7 @@ class _BottomTabBar extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppTheme.radiusL),
             onTap: () => onSelect(idx),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
@@ -768,7 +761,7 @@ class _BottomTabBar extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: selected ? 8 : 0, vertical: 10),
               decoration: BoxDecoration(
                 color: bg,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppTheme.radiusL),
                 border: Border.all(color: stroke, width: 1),
               ),
               child: FittedBox(
@@ -848,32 +841,40 @@ class _HeaderRow extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 onTap: onPickGroup,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.cardFill,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.cardStroke, width: 1),
+                    color: AppTheme.surface2,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                    border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.folder, size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 6),
-                      Text(
-                        subtitle ?? 'Selecteer BoetePot',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontWeight: FontWeight.w600,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final showRole = roleLabel != null && constraints.maxWidth >= 220;
+                      return Row(
+                        children: [
+                          const Icon(Icons.folder, size: 16, color: AppTheme.textSecondary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              subtitle ?? 'Selecteer BoetePot',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
-                      ),
-                      if (roleLabel != null) ...[
-                        const SizedBox(width: 8),
-                        AppPill(text: roleLabel!.toUpperCase()),
-                      ],
-                    ],
+                          ),
+                          if (showRole) ...[
+                            const SizedBox(width: 8),
+                            AppPill(text: roleLabel!.toUpperCase()),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -925,14 +926,14 @@ class _HeaderRow extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        customBorder: const CircleBorder(),
+        borderRadius: BorderRadius.circular(AppTheme.radiusM),
         child: Container(
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
-            color: AppTheme.cardFill,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.cardStroke, width: 1),
+            color: AppTheme.surface2,
+            borderRadius: BorderRadius.circular(AppTheme.radiusM),
+            border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
           ),
           child: Icon(icon, size: 18, color: AppTheme.textPrimary),
         ),

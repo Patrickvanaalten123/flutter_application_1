@@ -38,14 +38,17 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       appBar: AppBar(
         title: const Text('Sjablonen'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.playlist_add),
-            tooltip: 'Toevoegen uit sjablonen',
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => AddFromTemplatesScreen(groupId: widget.groupId, members: widget.currentMembers),
-              ));
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: AppIconButton(
+              icon: Icons.playlist_add,
+              tooltip: 'Toevoegen uit sjablonen',
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => AddFromTemplatesScreen(groupId: widget.groupId, members: widget.currentMembers),
+                ));
+              },
+            ),
           ),
         ],
       ),
@@ -170,42 +173,68 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
   }
 
   Widget _templateTile(BoeteTemplate t) {
-    return ListTile(
-      title: Text(t.title),
-      subtitle: Text('${t.description}\n€${t.amount.toStringAsFixed(2)}'),
-      isThreeLine: true,
-      leading: widget.isAdmin
-          ? Icon(
-              t.isActive ? Icons.circle : Icons.circle_outlined,
-              color: t.isActive ? Colors.greenAccent : AppTheme.textSecondary,
-              size: 14,
-            )
-          : null,
-      trailing: widget.isAdmin
-          ? PopupMenuButton<String>(
-              onSelected: (v) async {
-                if (v == 'edit') {
-                  await _showEditDialog(context, t);
-                } else if (v == 'toggle') {
-                  if (t.isActive) {
-                    await _service.deactivateTemplate(t);
-                  } else {
-                    await _service.activateTemplate(t);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: AppCard.dense(
+        child: Row(
+          children: [
+            if (widget.isAdmin) ...[
+              AppBadge(
+                text: t.isActive ? 'ACTIEF' : 'INACTIEF',
+                style: t.isActive ? AppBadgeStyle.accent : AppBadgeStyle.neutral,
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    t.description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            AmountPill(text: '€${t.amount.toStringAsFixed(2)}'),
+            if (widget.isAdmin) ...[
+              const SizedBox(width: 6),
+              PopupMenuButton<String>(
+                onSelected: (v) async {
+                  if (v == 'edit') {
+                    await _showEditDialog(context, t);
+                  } else if (v == 'toggle') {
+                    if (t.isActive) {
+                      await _service.deactivateTemplate(t);
+                    } else {
+                      await _service.activateTemplate(t);
+                    }
+                  } else if (v == 'delete') {
+                    await _service.deleteTemplate(t);
                   }
-                } else if (v == 'delete') {
-                  await _service.deleteTemplate(t);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('Wijzig')),
-                PopupMenuItem(
-                  value: 'toggle',
-                  child: Text(t.isActive ? 'Deactiveer' : 'Activeer'),
-                ),
-                const PopupMenuItem(value: 'delete', child: Text('Verwijder')),
-              ],
-            )
-          : null,
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Wijzig')),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    child: Text(t.isActive ? 'Deactiveer' : 'Activeer'),
+                  ),
+                  const PopupMenuItem(value: 'delete', child: Text('Verwijder')),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

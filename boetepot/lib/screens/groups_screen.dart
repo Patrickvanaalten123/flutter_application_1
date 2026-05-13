@@ -80,20 +80,18 @@ class GroupsScreen extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: InkWell(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(AppTheme.radiusL),
                 onTap: () => onSelect(g.groupId, g.name),
-                child: AppCard(
-                  radius: 22,
-                  padding: const EdgeInsets.all(14),
+                child: AppCard.dense(
                   child: Row(
                     children: [
                       Container(
-                        width: 36,
-                        height: 36,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: AppTheme.cardFill,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppTheme.cardStroke, width: 1),
+                          color: AppTheme.surface2,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                          border: Border.all(color: AppTheme.borderColor, width: AppTheme.borderWidth),
                         ),
                         child: const Icon(Icons.folder, color: AppTheme.gold, size: 18),
                       ),
@@ -104,7 +102,7 @@ class GroupsScreen extends StatelessWidget {
                           children: [
                             Text(
                               g.name,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
@@ -127,4 +125,3 @@ class GroupsScreen extends StatelessWidget {
     );
   }
 }
-

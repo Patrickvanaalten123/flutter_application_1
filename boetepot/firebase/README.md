@@ -58,4 +58,39 @@ Wat dit doet (server-side via Cloud Functions):
 - Verwijdert de Firebase Auth user
 
 Deploy:
-- `firebase deploy --only functions:deleteMyAccount`
+- `firebase deploy --only functions:deleteMyAccount,functions:onAccountDeletionRequested`
+
+## Mollie betalingen (betaalronde)
+
+De app kan per gebruiker een Mollie checkout starten voor een openstaande betaling in een betaalronde.
+
+Let op: Mollie UI staat in de app standaard uit (feature-flag), zodat je het later eenvoudig kunt activeren zonder dat het nu zichtbaar is.
+
+Feature flags (Firestore `groups/{groupId}`):
+- Pro (betaallink zichtbaar/instelbaar): zet `billing.plan` op `"pro"` (of `isPro: true`).
+- Mollie UI zichtbaar: zet `features.molliePaymentsEnabled` op `true`.
+
+Concept:
+- Boetepot admin koppelt Mollie (Connect/OAuth) aan een BoetePot.
+- In de betaalronde kan ieder lid zijn eigen betaling starten via **Betaal nu**.
+- Servicekosten worden bovenop het bedrag gerekend:
+  - `>= €100` → `1%`
+  - anders → `3%`
+  - minimum `€1`
+- Webhook zet de betaling automatisch op `paid` in Firestore.
+
+Benodigde Functions:
+- `startMollieConnect` (callable)
+- `mollieOAuthCallback` (https)
+- `createMolliePaymentForRound` (callable)
+- `mollieWebhook` (https)
+
+Benodigde env vars (Cloud Functions):
+- `MOLLIE_CLIENT_ID`
+- `MOLLIE_CLIENT_SECRET`
+- `MOLLIE_REDIRECT_URL` (moet matchen met je Mollie OAuth app)
+- `MOLLIE_PAYMENT_REDIRECT_URL` (waar Mollie na betaling terugkomt)
+- `MOLLIE_WEBHOOK_URL` (de `mollieWebhook` endpoint URL)
+
+Deploy (Functions):
+- `firebase deploy --only functions:startMollieConnect,functions:mollieOAuthCallback,functions:createMolliePaymentForRound,functions:mollieWebhook`
